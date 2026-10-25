@@ -2,11 +2,9 @@ package com.example.widget
 
 import android.content.Context
 import androidx.glance.appwidget.GlanceAppWidgetManager
-import androidx.glance.appwidget.updateAll
+import androidx.glance.appwidget.state.updateAppWidgetState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-
-import androidx.glance.appwidget.state.updateAppWidgetState
 
 object WidgetUpdater {
 
@@ -44,31 +42,31 @@ object WidgetUpdater {
     }
 
     suspend fun updateAllWidgets(context: Context) = withContext(Dispatchers.IO) {
-        try {
-            val manager = GlanceAppWidgetManager(context)
+        val manager = GlanceAppWidgetManager(context)
+        val widgets = listOf(
+            SmallCountdownWidget(),
+            MediumCountdownWidget(),
+            ProgressCountdownWidget()
+        )
 
-            runCatching {
-                val ids = manager.getGlanceIds(SmallCountdownWidget::class.java)
-                if (ids.isNotEmpty()) {
-                    SmallCountdownWidget().updateAll(context)
-                }
-            }.onFailure { it.printStackTrace() }
+        for (widget in widgets) {
+            val ids = runCatching {
+                manager.getGlanceIds(widget.javaClass)
+            }.getOrElse { error ->
+                error.printStackTrace()
+                emptyList()
+            }
 
-            runCatching {
-                val ids = manager.getGlanceIds(MediumCountdownWidget::class.java)
-                if (ids.isNotEmpty()) {
-                    MediumCountdownWidget().updateAll(context)
+            for (id in ids) {
+                runCatching {
+                    updateAppWidgetState(context, id) { prefs ->
+                        prefs[WIDGET_REFRESH_TICK_KEY] = System.currentTimeMillis()
+                    }
+                    widget.update(context, id)
+                }.onFailure { error ->
+                    error.printStackTrace()
                 }
-            }.onFailure { it.printStackTrace() }
-
-            runCatching {
-                val ids = manager.getGlanceIds(ProgressCountdownWidget::class.java)
-                if (ids.isNotEmpty()) {
-                    ProgressCountdownWidget().updateAll(context)
-                }
-            }.onFailure { it.printStackTrace() }
-        } catch (e: Throwable) {
-            e.printStackTrace()
+            }
         }
     }
 }

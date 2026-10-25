@@ -1,10 +1,12 @@
 package com.example.widget
 
 import android.content.Context
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.datastore.preferences.core.longPreferencesKey
+import androidx.datastore.preferences.core.Preferences
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.Image
@@ -21,6 +23,7 @@ import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.provideContent
 import androidx.glance.appwidget.state.getAppWidgetState
 import androidx.glance.background
+import androidx.glance.currentState
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
 import androidx.glance.layout.Column
@@ -37,7 +40,6 @@ import androidx.glance.text.TextAlign
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 import com.example.MainActivity
-import com.example.data.AppDatabase
 import com.example.data.Countdown
 import com.example.util.RingBitmapUtil
 import com.example.util.TimeFormatUtils
@@ -49,9 +51,6 @@ class ProgressCountdownWidget : GlanceAppWidget() {
     override val stateDefinition: GlanceStateDefinition<*> = PreferencesGlanceStateDefinition
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val db = AppDatabase.getInstance(context)
-
-        // 1. Resolve appWidgetId
         val appWidgetId: Int = when (id) {
             is AppWidgetId -> id.appWidgetId
             else -> {
@@ -61,43 +60,21 @@ class ProgressCountdownWidget : GlanceAppWidget() {
             }
         }
 
-        // 1. The value in the Glance state (WIDGET_COUNTDOWN_PREF_KEY) for this widget, if it is not null and not -1.
-        val stateCountdownId: Long? = runCatching {
-            val prefs = getAppWidgetState(context, PreferencesGlanceStateDefinition, id)
-            prefs[WIDGET_COUNTDOWN_PREF_KEY]
+        val initialPrefs = runCatching {
+            getAppWidgetState(context, PreferencesGlanceStateDefinition, id)
         }.getOrNull()
-
-        // 2. The value from WidgetPreferences.getSpecificCountdownId(context, appWidgetId), if it is not -1.
-        val specificPrefsId = if (appWidgetId > 0) {
-            WidgetPreferences.getSpecificCountdownId(context, appWidgetId)
-        } else -1L
-
-        // Choose the countdown in this order only:
-        // 1. Glance state (WIDGET_COUNTDOWN_PREF_KEY) if not null and not -1
-        // 2. Specific countdown id from SharedPreferences if not -1
-        // 3. Otherwise fallback countdown
-        val targetCountdownId = when {
-            stateCountdownId != null && stateCountdownId != -1L -> stateCountdownId
-            specificPrefsId != -1L -> specificPrefsId
-            else -> -1L
-        }
-
-        val countdown: Countdown? = if (targetCountdownId != -1L) {
-            db.countdownDao().getCountdownByIdSync(targetCountdownId)
-                ?: getFallbackCountdown(db)
-        } else {
-            getFallbackCountdown(db)
-        }
+        val initialCountdownId = initialPrefs?.get(WIDGET_COUNTDOWN_PREF_KEY)
+        val initial = WidgetDataLoader.loadCountdown(context, appWidgetId, initialCountdownId)
 
         provideContent {
+            val prefs = currentState<Preferences>()
+            val stateId = prefs[WIDGET_COUNTDOWN_PREF_KEY]
+            val tick = prefs[WIDGET_REFRESH_TICK_KEY]
+            val countdown by produceState<Countdown?>(initial, stateId, tick) {
+                value = WidgetDataLoader.loadCountdown(context, appWidgetId, stateId)
+            }
             ProgressWidgetContent(countdown = countdown)
         }
-    }
-
-    private suspend fun getFallbackCountdown(db: AppDatabase): Countdown? {
-        val now = System.currentTimeMillis()
-        val upcoming = db.countdownDao().getUpcomingCountdownsSync(now, 1)
-        return upcoming.firstOrNull() ?: db.countdownDao().getAllCountdownsSync().firstOrNull()
     }
 }
 

@@ -28,10 +28,12 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.service.BatteryAlertService
+import com.example.ui.alerts.AlertsScreen
+import com.example.ui.alerts.AlertsViewModel
 import com.example.ui.countdowns.CountdownsScreen
 import com.example.ui.countdowns.CountdownsViewModel
 import com.example.ui.navigation.Screen
-import com.example.ui.placeholders.AlertsPlaceholderScreen
 import com.example.ui.placeholders.ContactsPlaceholderScreen
 import com.example.ui.placeholders.SettingsPlaceholderScreen
 import com.example.ui.theme.CyanPrimary
@@ -50,6 +52,7 @@ import kotlinx.coroutines.launch
 class MainActivity : ComponentActivity() {
 
     private val countdownsViewModel: CountdownsViewModel by viewModels()
+    private val alertsViewModel: AlertsViewModel by viewModels()
     private var pendingCountdownId = mutableStateOf<Long?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -61,6 +64,7 @@ class MainActivity : ComponentActivity() {
 
         try {
             CountdownWorker.schedulePeriodicUpdates(applicationContext)
+            BatteryAlertService.syncWithDatabase(applicationContext)
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -112,7 +116,10 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         Screen.Alerts -> {
-                            AlertsPlaceholderScreen()
+                            AlertsScreen(
+                                viewModel = alertsViewModel,
+                                modifier = Modifier.padding(innerPadding)
+                            )
                         }
                         Screen.Contacts -> {
                             ContactsPlaceholderScreen()

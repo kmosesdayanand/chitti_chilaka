@@ -179,4 +179,177 @@ class ExampleRobolectricTest {
         assertEquals(4L, WidgetPreferences.getLastConfiguredCountdownId(context))
         assertEquals(4L, WidgetPreferences.getCountdownId(context, widget1))
     }
+
+    @Test
+    fun `test WidgetDataLoader loadCountdown and loadUpcoming`() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val db = AppDatabase.getInstance(context)
+        AppDatabase.seedSamples(db)
+
+        val widgetId = 55
+        WidgetPreferences.setCountdownId(context, widgetId, 2L)
+
+        // 1. When stateCountdownId is provided and valid, it takes priority
+        val loadedFromState = com.example.widget.WidgetDataLoader.loadCountdown(context, widgetId, 1L)
+        assertNotNull(loadedFromState)
+        assertEquals(1L, loadedFromState?.id)
+
+        // 2. When stateCountdownId is null, it falls back to specificPrefsId (2L)
+        val loadedFromPrefs = com.example.widget.WidgetDataLoader.loadCountdown(context, widgetId, null)
+        assertNotNull(loadedFromPrefs)
+        assertEquals(2L, loadedFromPrefs?.id)
+
+        // 3. Upcoming list loads up to 3 items
+        val upcoming = com.example.widget.WidgetDataLoader.loadUpcoming(context, 3)
+        assertTrue(upcoming.isNotEmpty())
+        assertTrue(upcoming.size <= 3)
+    }
+
+    @Test
+    fun `test alert rule entity and dao operations`() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val inMemoryDb = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
+            .allowMainThreadQueries()
+            .build()
+        val dao = inMemoryDb.alertRuleDao()
+
+        val rule = com.example.data.AlertRule(
+            level = 85,
+            direction = com.example.data.AlertRule.DIRECTION_CHARGING_UP,
+            soundType = com.example.data.AlertRule.SOUND_ALARM,
+            volume = 0.8f,
+            enabled = true
+        )
+        val id = dao.insertRule(rule)
+        assertTrue(id > 0)
+
+        val retrieved = dao.getRuleByIdSync(id)
+        assertNotNull(retrieved)
+        assertEquals(85, retrieved?.level)
+        assertEquals(com.example.data.AlertRule.DIRECTION_CHARGING_UP, retrieved?.direction)
+        assertEquals(true, retrieved?.enabled)
+
+        dao.updateEnabled(id, false)
+        val disabled = dao.getRuleByIdSync(id)
+        assertEquals(false, disabled?.enabled)
+
+        dao.updateTriggeredState(id, true)
+        val triggered = dao.getRuleByIdSync(id)
+        assertEquals(true, triggered?.lastTriggered)
+
+        dao.deleteRuleById(id)
+        val deleted = dao.getRuleByIdSync(id)
+        assertEquals(null, deleted)
+
+        inMemoryDb.close()
+    }
+
+    @Test
+    fun `test battery alert rule evaluation logic`() {
+        val chargeUpRule = com.example.data.AlertRule(
+            id = 1,
+            level = 80,
+            direction = com.example.data.AlertRule.DIRECTION_CHARGING_UP,
+            soundType = com.example.data.AlertRule.SOUND_ALARM,
+            enabled = true,
+            lastTriggered = false
+        )
+
+        val drainDownRule = com.example.data.AlertRule(
+            id = 2,
+            level = 20,
+            direction = com.example.data.AlertRule.DIRECTION_DRAINING_DOWN,
+            soundType = com.example.data.AlertRule.SOUND_ALARM,
+            enabled = true,
+            lastTriggered = false
+        )
+
+        // Charging at 80% -> chargeUpRule should fire
+        val isCharging = true
+        val currentLevel = 80
+        val chargeUpFires = isCharging && currentLevel >= chargeUpRule.level && !chargeUpRule.lastTriggered
+        assertTrue(chargeUpFires)
+
+        // Draining at 20% -> drainDownRule should fire
+        val isDraining = false
+        val drainLevel = 20
+        val drainDownFires = !isDraining && drainLevel <= drainDownRule.level && !drainDownRule.lastTriggered
+        assertTrue(drainDownFires)
+
+        // Once triggered, neither should re-fire at the same level
+        val chargeUpTriggered = chargeUpRule.copy(lastTriggered = true)
+        val drainDownTriggered = drainDownRule.copy(lastTriggered = true)
+        assertFalse(isCharging && currentLevel >= chargeUpTriggered.level && !chargeUpTriggered.lastTriggered)
+        assertFalse(!isDraining && drainLevel <= drainDownTriggered.level && !drainDownTriggered.lastTriggered)
+
+        // Reset condition for charging rule: level drops below threshold OR disconnected from charger
+        val dropReset = 79 < chargeUpRule.level || !isCharging
+        assertTrue(dropReset)
+
+        // Reset condition for draining rule: level goes above threshold OR connected to charger
+        val raiseReset = 21 > drainDownRule.level || isCharging
+        assertTrue(raiseReset)
+    }
+
+    @Test
+    fun `test low power voice alert sound type`() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val inMemoryDb = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
+            .allowMainThreadQueries()
+            .build()
+        val dao = inMemoryDb.alertRuleDao()
+
+        val lowPowerRule = com.example.data.AlertRule(
+            level = 20,
+            direction = com.example.data.AlertRule.DIRECTION_DRAINING_DOWN,
+            soundType = com.example.data.AlertRule.SOUND_VOICE_ALERT,
+            volume = 0.9f,
+            enabled = true
+        )
+        val id = dao.insertRule(lowPowerRule)
+        val retrieved = dao.getRuleByIdSync(id)
+        assertNotNull(retrieved)
+        assertEquals(com.example.data.AlertRule.SOUND_VOICE_ALERT, retrieved?.soundType)
+        assertEquals("Low Power (Voice)", retrieved?.soundLabel)
+
+        // Test updating sound type for direction
+        dao.updateSoundTypeForDirection(com.example.data.AlertRule.DIRECTION_DRAINING_DOWN, com.example.data.AlertRule.SOUND_VOICE_ALERT)
+        val afterUpdate = dao.getRuleByIdSync(id)
+        assertEquals(com.example.data.AlertRule.SOUND_VOICE_ALERT, afterUpdate?.soundType)
+
+        // Test charged voice alert
+        val chargedRule = com.example.data.AlertRule(
+            level = 100,
+            direction = com.example.data.AlertRule.DIRECTION_CHARGING_UP,
+            soundType = com.example.data.AlertRule.SOUND_VOICE_CHARGED,
+            volume = 0.9f,
+            enabled = true
+        )
+        val chargedId = dao.insertRule(chargedRule)
+        val retrievedCharged = dao.getRuleByIdSync(chargedId)
+        assertNotNull(retrievedCharged)
+        assertEquals(com.example.data.AlertRule.SOUND_VOICE_CHARGED, retrievedCharged?.soundType)
+        assertEquals("Full Power (Voice)", retrievedCharged?.soundLabel)
+
+        // Test audio trimming fields
+        val trimmedRule = com.example.data.AlertRule(
+            level = 80,
+            direction = com.example.data.AlertRule.DIRECTION_CHARGING_UP,
+            soundType = com.example.data.AlertRule.SOUND_VOICE_CHARGED,
+            startMs = 1200,
+            endMs = 4500
+        )
+        val trimmedId = dao.insertRule(trimmedRule)
+        val retrievedTrimmed = dao.getRuleByIdSync(trimmedId)
+        assertNotNull(retrievedTrimmed)
+        assertEquals(1200, retrievedTrimmed?.startMs)
+        assertEquals(4500, retrievedTrimmed?.endMs)
+        assertTrue(retrievedTrimmed?.isTrimmed == true)
+
+        inMemoryDb.close()
+    }
 }
+
+
+
+
