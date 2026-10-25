@@ -1,0 +1,12 @@
+<resources>
+    <string name="app_name">Phone Manager</string>
+    <string name="widget_small_desc">Displays days left and emoji for a selected countdown event.</string>
+    <string name="widget_medium_desc">Displays the next 3 upcoming countdowns in a list.</string>
+    <string name="widget_progress_desc">Displays an elapsed progress ring and remaining time for a countdown.</string>
+    
+    <!-- Tab Titles -->
+    <string name="tab_countdowns">Countdowns</string>
+    <string name="tab_alerts">Alerts</string>
+    <string name="tab_contacts">Contacts</string>
+    <string name="tab_settings">Settings</string>
+</resources>

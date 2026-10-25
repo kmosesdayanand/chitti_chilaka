@@ -1,0 +1,6 @@
+{
+  "name": "Phone Manager",
+  "description": "Personal phone utility app with event countdowns, modular tools, and customizable home screen Glance widgets.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
