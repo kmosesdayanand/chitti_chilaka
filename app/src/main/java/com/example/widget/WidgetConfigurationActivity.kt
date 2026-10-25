@@ -204,7 +204,7 @@ class WidgetConfigurationActivity : ComponentActivity() {
                                                             providerClass.contains("Medium") -> {
                                                                 runCatching { MediumCountdownWidget().update(applicationContext, glanceId) }
                                                             }
-                                                            else -> {
+                                                            providerClass.contains("Small") -> {
                                                                 runCatching { SmallCountdownWidget().update(applicationContext, glanceId) }
                                                             }
                                                         }

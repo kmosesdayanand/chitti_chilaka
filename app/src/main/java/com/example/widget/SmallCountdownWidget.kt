@@ -62,25 +62,24 @@ class SmallCountdownWidget : GlanceAppWidget() {
             }
         }
 
-        // 2. Check widget-specific SharedPreferences first
-        val specificPrefsId = if (appWidgetId > 0) {
-            WidgetPreferences.getSpecificCountdownId(context, appWidgetId)
-        } else -1L
-
-        // 3. Check Glance DataStore state next
+        // 1. The value in the Glance state (WIDGET_COUNTDOWN_PREF_KEY) for this widget, if it is not null and not -1.
         val stateCountdownId: Long? = runCatching {
             val prefs = getAppWidgetState(context, PreferencesGlanceStateDefinition, id)
             prefs[WIDGET_COUNTDOWN_PREF_KEY]
         }.getOrNull()
 
-        // 4. Fallback to last configured countdown ID
-        val lastConfiguredId = WidgetPreferences.getLastConfiguredCountdownId(context)
+        // 2. The value from WidgetPreferences.getSpecificCountdownId(context, appWidgetId), if it is not -1.
+        val specificPrefsId = if (appWidgetId > 0) {
+            WidgetPreferences.getSpecificCountdownId(context, appWidgetId)
+        } else -1L
 
-        // Determine target countdown: prioritize specific widget configuration, then DataStore, then last configured
+        // Choose the countdown in this order only:
+        // 1. Glance state (WIDGET_COUNTDOWN_PREF_KEY) if not null and not -1
+        // 2. Specific countdown id from SharedPreferences if not -1
+        // 3. Otherwise fallback countdown
         val targetCountdownId = when {
-            specificPrefsId != -1L -> specificPrefsId
             stateCountdownId != null && stateCountdownId != -1L -> stateCountdownId
-            lastConfiguredId != -1L -> lastConfiguredId
+            specificPrefsId != -1L -> specificPrefsId
             else -> -1L
         }
 
@@ -274,4 +273,9 @@ private fun SmallWidgetContent(countdown: Countdown?) {
 
 class SmallCountdownWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = SmallCountdownWidget()
+
+    override fun onDeleted(context: Context, appWidgetIds: IntArray) {
+        super.onDeleted(context, appWidgetIds)
+        appWidgetIds.forEach { WidgetPreferences.removeWidgetConfig(context, it) }
+    }
 }
