@@ -1,24 +1,47 @@
 package com.example.ui.theme
 
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
-// Sentry Navy & Teal Brand Palette (derived from the Sentry ribbon logo)
+// Sentry Navy & Teal Brand Palette
 val SentryNavy950 = Color(0xFF020B24) // Midnight navy screen background
 val SentryNavy900 = Color(0xFF07143B) // Card & sheet container navy
 val SentryNavy800 = Color(0xFF0E2259) // Elevated component navy
 val SentryNavy700 = Color(0xFF17357A) // Surface variant
 val SentryNavyBorder = Color(0xFF1C3D88) // Subtle navy border
 
-// Backward-compatible surface aliases
-val DeepSlate950 = SentryNavy950
-val DeepSlate900 = SentryNavy900
-val SurfaceSlate800 = SentryNavy800
-val SurfaceVariantSlate700 = SentryNavy700
-val BorderSlate700 = SentryNavyBorder
+// Adaptive surface and text colors that automatically follow system/app theme
+val DeepSlate950: Color
+    @Composable
+    get() = if (LocalIsDarkTheme.current) SentryNavy950 else Color(0xFFF1F5F9)
 
-val TextPrimary = Color(0xFFF8FAFC)
-val TextSecondary = Color(0xFF94A3B8)
-val TextMuted = Color(0xFF64748B)
+val DeepSlate900: Color
+    @Composable
+    get() = if (LocalIsDarkTheme.current) SentryNavy900 else Color(0xFFFFFFFF)
+
+val SurfaceSlate800: Color
+    @Composable
+    get() = if (LocalIsDarkTheme.current) SentryNavy800 else Color(0xFFE2E8F0)
+
+val SurfaceVariantSlate700: Color
+    @Composable
+    get() = if (LocalIsDarkTheme.current) SentryNavy700 else Color(0xFFCBD5E1)
+
+val BorderSlate700: Color
+    @Composable
+    get() = if (LocalIsDarkTheme.current) SentryNavyBorder else Color(0xFFE2E8F0)
+
+val TextPrimary: Color
+    @Composable
+    get() = if (LocalIsDarkTheme.current) Color(0xFFF8FAFC) else Color(0xFF0F172A)
+
+val TextSecondary: Color
+    @Composable
+    get() = if (LocalIsDarkTheme.current) Color(0xFF94A3B8) else Color(0xFF475569)
+
+val TextMuted: Color
+    @Composable
+    get() = if (LocalIsDarkTheme.current) Color(0xFF64748B) else Color(0xFF94A3B8)
 
 // Brand Teals (Luminous Sentry glow and ribbon accents)
 val SentryTealPrimary = Color(0xFF00E5D0) // Glowing vibrant teal

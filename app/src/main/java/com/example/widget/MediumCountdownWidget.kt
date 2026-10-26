@@ -56,13 +56,13 @@ class MediumCountdownWidget : GlanceAppWidget() {
             val items by produceState<List<Countdown>>(initial, tick) {
                 value = WidgetDataLoader.loadUpcoming(context, 3)
             }
-            MediumWidgetContent(items = items)
+            MediumWidgetContent(context = context, items = items)
         }
     }
 }
 
 @androidx.compose.runtime.Composable
-private fun MediumWidgetContent(items: List<Countdown>) {
+private fun MediumWidgetContent(context: Context, items: List<Countdown>) {
     val backgroundColor = Color(0xFF0F172A)
 
     Box(
@@ -114,7 +114,7 @@ private fun MediumWidgetContent(items: List<Countdown>) {
                 }
             } else {
                 items.forEachIndexed { index, countdown ->
-                    MediumCountdownRow(countdown = countdown)
+                    MediumCountdownRow(context = context, countdown = countdown)
                     if (index < items.size - 1) {
                         Spacer(modifier = GlanceModifier.height(4.dp))
                     }
@@ -125,10 +125,15 @@ private fun MediumWidgetContent(items: List<Countdown>) {
 }
 
 @androidx.compose.runtime.Composable
-private fun MediumCountdownRow(countdown: Countdown) {
-    val rowClickAction = actionStartActivity<MainActivity>(
-        actionParametersOf(COUNTDOWN_ID_KEY to countdown.id)
-    )
+private fun MediumCountdownRow(context: Context, countdown: Countdown) {
+    val opensItem = WidgetPreferences.isWidgetTapOpensItemEnabled(context)
+    val rowClickAction = if (opensItem) {
+        actionStartActivity<MainActivity>(
+            actionParametersOf(COUNTDOWN_ID_KEY to countdown.id)
+        )
+    } else {
+        actionStartActivity<MainActivity>()
+    }
 
     val timeRemaining = TimeFormatUtils.computeRemaining(
         targetTimeMillis = countdown.targetTimeMillis,

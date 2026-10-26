@@ -35,6 +35,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -92,9 +94,20 @@ class WidgetConfigurationActivity : ComponentActivity() {
         }
 
         setContent {
-            MyApplicationTheme(darkTheme = true) {
+            val systemDark = androidx.compose.foundation.isSystemInDarkTheme()
+            val themeMode = WidgetPreferences.getThemeMode(this@WidgetConfigurationActivity)
+            val isDark = when (themeMode) {
+                "DARK" -> true
+                "LIGHT" -> false
+                else -> systemDark
+            }
+
+            MyApplicationTheme(darkTheme = isDark) {
                 val coroutineScope = rememberCoroutineScope()
                 var countdowns by remember { mutableStateOf<List<Countdown>?>(null) }
+                var tapOpensItem by remember {
+                    mutableStateOf(WidgetPreferences.isWidgetTapOpensItemEnabled(this@WidgetConfigurationActivity))
+                }
 
                 LaunchedEffect(Unit) {
                     withContext(Dispatchers.IO) {
@@ -117,7 +130,7 @@ class WidgetConfigurationActivity : ComponentActivity() {
                                     )
                                     Text(
                                         text = "Choose an event for this widget",
-                                        style = MaterialTheme.typography.bodySmall.copy(color = Color(0xFF94A3B8))
+                                        style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     )
                                 }
                             },
@@ -133,13 +146,13 @@ class WidgetConfigurationActivity : ComponentActivity() {
                                 }
                             },
                             colors = TopAppBarDefaults.topAppBarColors(
-                                containerColor = Color(0xFF0F172A),
-                                titleContentColor = Color.White,
-                                navigationIconContentColor = Color.White
+                                containerColor = MaterialTheme.colorScheme.surface,
+                                titleContentColor = MaterialTheme.colorScheme.onSurface,
+                                navigationIconContentColor = MaterialTheme.colorScheme.onSurface
                             )
                         )
                     },
-                    containerColor = Color(0xFF0F172A)
+                    containerColor = MaterialTheme.colorScheme.background
                 ) { innerPadding ->
                     Box(
                         modifier = Modifier
@@ -155,7 +168,7 @@ class WidgetConfigurationActivity : ComponentActivity() {
                         } else if (list.isEmpty()) {
                             Text(
                                 text = "No countdowns available.\nOpen Sentry to create one.",
-                                color = Color(0xFF94A3B8),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier
                                     .align(Alignment.Center)
                                     .padding(24.dp),
@@ -167,6 +180,63 @@ class WidgetConfigurationActivity : ComponentActivity() {
                                 contentPadding = PaddingValues(16.dp),
                                 verticalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
+                                item {
+                                    Card(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(bottom = 6.dp),
+                                        shape = RoundedCornerShape(14.dp),
+                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(14.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Text(
+                                                    text = "Open event on widget tap",
+                                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = MaterialTheme.colorScheme.onSurface
+                                                    )
+                                                )
+                                                Spacer(modifier = Modifier.height(2.dp))
+                                                Text(
+                                                    text = if (tapOpensItem) {
+                                                        "Tapping widget focuses this countdown in Sentry"
+                                                    } else {
+                                                        "Tapping widget opens the main Sentry overview"
+                                                    },
+                                                    style = MaterialTheme.typography.bodySmall.copy(
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                )
+                                            }
+                                            Spacer(modifier = Modifier.width(10.dp))
+                                            Switch(
+                                                checked = tapOpensItem,
+                                                onCheckedChange = { checked ->
+                                                    tapOpensItem = checked
+                                                    WidgetPreferences.setWidgetTapOpensItemEnabled(
+                                                        this@WidgetConfigurationActivity,
+                                                        checked
+                                                    )
+                                                    coroutineScope.launch {
+                                                        WidgetUpdater.updateAllWidgets(this@WidgetConfigurationActivity)
+                                                    }
+                                                },
+                                                colors = SwitchDefaults.colors(
+                                                    checkedThumbColor = Color.White,
+                                                    checkedTrackColor = MaterialTheme.colorScheme.primary
+                                                )
+                                            )
+                                        }
+                                    }
+                                }
+
                                 items(list, key = { it.id }) { item ->
                                     CountdownSelectionItem(
                                         countdown = item,

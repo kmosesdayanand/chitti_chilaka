@@ -81,6 +81,21 @@ class ExampleRobolectricTest {
 
         WidgetPreferences.setLastConfiguredCountdownId(context, 99L)
         assertEquals(99L, WidgetPreferences.getLastConfiguredCountdownId(context))
+
+        // Test widget tap opens item toggle
+        assertTrue(WidgetPreferences.isWidgetTapOpensItemEnabled(context))
+        WidgetPreferences.setWidgetTapOpensItemEnabled(context, false)
+        assertFalse(WidgetPreferences.isWidgetTapOpensItemEnabled(context))
+        WidgetPreferences.setWidgetTapOpensItemEnabled(context, true)
+        assertTrue(WidgetPreferences.isWidgetTapOpensItemEnabled(context))
+
+        // Test theme mode
+        assertEquals("SYSTEM", WidgetPreferences.getThemeMode(context))
+        WidgetPreferences.setThemeMode(context, "DARK")
+        assertEquals("DARK", WidgetPreferences.getThemeMode(context))
+        WidgetPreferences.setThemeMode(context, "LIGHT")
+        assertEquals("LIGHT", WidgetPreferences.getThemeMode(context))
+        WidgetPreferences.setThemeMode(context, "SYSTEM")
     }
 
     @Test

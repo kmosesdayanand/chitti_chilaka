@@ -67,4 +67,27 @@ object WidgetPreferences {
                 .commit()
         }
     }
+
+    const val KEY_WIDGET_TAP_OPENS_ITEM = "widget_tap_opens_item"
+    const val KEY_THEME_MODE = "app_theme_mode" // "SYSTEM", "DARK", "LIGHT"
+
+    fun isWidgetTapOpensItemEnabled(context: Context): Boolean {
+        return getPrefs(context).getBoolean(KEY_WIDGET_TAP_OPENS_ITEM, true)
+    }
+
+    fun setWidgetTapOpensItemEnabled(context: Context, enabled: Boolean) {
+        getPrefs(context).edit()
+            .putBoolean(KEY_WIDGET_TAP_OPENS_ITEM, enabled)
+            .commit()
+    }
+
+    fun getThemeMode(context: Context): String {
+        return getPrefs(context).getString(KEY_THEME_MODE, "SYSTEM") ?: "SYSTEM"
+    }
+
+    fun setThemeMode(context: Context, mode: String) {
+        getPrefs(context).edit()
+            .putString(KEY_THEME_MODE, mode)
+            .commit()
+    }
 }

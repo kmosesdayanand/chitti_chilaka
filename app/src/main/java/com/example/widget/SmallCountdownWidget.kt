@@ -76,14 +76,15 @@ class SmallCountdownWidget : GlanceAppWidget() {
             val countdown by produceState<Countdown?>(initial, stateId, tick) {
                 value = WidgetDataLoader.loadCountdown(context, appWidgetId, stateId)
             }
-            SmallWidgetContent(countdown = countdown)
+            SmallWidgetContent(context = context, countdown = countdown)
         }
     }
 }
 
 @androidx.compose.runtime.Composable
-private fun SmallWidgetContent(countdown: Countdown?) {
-    val clickAction = if (countdown != null) {
+private fun SmallWidgetContent(context: Context, countdown: Countdown?) {
+    val opensItem = WidgetPreferences.isWidgetTapOpensItemEnabled(context)
+    val clickAction = if (countdown != null && opensItem) {
         actionStartActivity<MainActivity>(actionParametersOf(COUNTDOWN_ID_KEY to countdown.id))
     } else {
         actionStartActivity<MainActivity>()

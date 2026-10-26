@@ -77,7 +77,17 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            MyApplicationTheme(darkTheme = true) {
+            val systemDark = androidx.compose.foundation.isSystemInDarkTheme()
+            var themeMode by remember {
+                mutableStateOf(com.example.widget.WidgetPreferences.getThemeMode(this@MainActivity))
+            }
+            val isDark = when (themeMode) {
+                "DARK" -> true
+                "LIGHT" -> false
+                else -> systemDark
+            }
+
+            MyApplicationTheme(darkTheme = isDark) {
                 var showSplash by remember { mutableStateOf(true) }
                 var currentScreen by remember { mutableStateOf<Screen>(Screen.Countdowns) }
                 val targetId by pendingCountdownId
@@ -132,7 +142,11 @@ class MainActivity : ComponentActivity() {
                                 ContactsPlaceholderScreen()
                             }
                             Screen.Settings -> {
-                                SettingsPlaceholderScreen()
+                                SettingsPlaceholderScreen(
+                                    onThemeModeChanged = { newMode ->
+                                        themeMode = newMode
+                                    }
+                                )
                             }
                         }
                     }
@@ -149,9 +163,13 @@ class MainActivity : ComponentActivity() {
 
     private fun handleWidgetIntent(intent: Intent?) {
         val countdownId = intent?.getLongExtra("EXTRA_COUNTDOWN_ID", -1L) ?: -1L
-        if (countdownId != -1L) {
+        val openItemOnTap = com.example.widget.WidgetPreferences.isWidgetTapOpensItemEnabled(this)
+        if (countdownId != -1L && openItemOnTap) {
             pendingCountdownId.value = countdownId
             countdownsViewModel.setHighlightedId(countdownId)
+        } else {
+            pendingCountdownId.value = null
+            countdownsViewModel.setHighlightedId(null)
         }
     }
 }

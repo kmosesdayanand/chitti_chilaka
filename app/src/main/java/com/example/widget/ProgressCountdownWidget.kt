@@ -73,14 +73,15 @@ class ProgressCountdownWidget : GlanceAppWidget() {
             val countdown by produceState<Countdown?>(initial, stateId, tick) {
                 value = WidgetDataLoader.loadCountdown(context, appWidgetId, stateId)
             }
-            ProgressWidgetContent(countdown = countdown)
+            ProgressWidgetContent(context = context, countdown = countdown)
         }
     }
 }
 
 @androidx.compose.runtime.Composable
-private fun ProgressWidgetContent(countdown: Countdown?) {
-    val clickAction = if (countdown != null) {
+private fun ProgressWidgetContent(context: Context, countdown: Countdown?) {
+    val opensItem = WidgetPreferences.isWidgetTapOpensItemEnabled(context)
+    val clickAction = if (countdown != null && opensItem) {
         actionStartActivity<MainActivity>(actionParametersOf(COUNTDOWN_ID_KEY to countdown.id))
     } else {
         actionStartActivity<MainActivity>()
