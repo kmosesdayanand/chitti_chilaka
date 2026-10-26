@@ -99,7 +99,6 @@ class WidgetConfigurationActivity : ComponentActivity() {
                 LaunchedEffect(Unit) {
                     withContext(Dispatchers.IO) {
                         val db = AppDatabase.getInstance(applicationContext)
-                        AppDatabase.seedSamples(db)
                         val list = db.countdownDao().getAllCountdownsSync()
                         withContext(Dispatchers.Main) {
                             countdowns = list
@@ -155,7 +154,7 @@ class WidgetConfigurationActivity : ComponentActivity() {
                             )
                         } else if (list.isEmpty()) {
                             Text(
-                                text = "No countdowns available.\nOpen Phone Manager to create one.",
+                                text = "No countdowns available.\nOpen Sentry to create one.",
                                 color = Color(0xFF94A3B8),
                                 modifier = Modifier
                                     .align(Alignment.Center)

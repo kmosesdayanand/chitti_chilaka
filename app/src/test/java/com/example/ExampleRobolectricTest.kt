@@ -25,7 +25,7 @@ class ExampleRobolectricTest {
     fun `read string from context`() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val appName = context.getString(R.string.app_name)
-        assertEquals("Phone Manager", appName)
+        assertEquals("Sentry", appName)
     }
 
     @Test
@@ -345,6 +345,34 @@ class ExampleRobolectricTest {
         assertEquals(1200, retrievedTrimmed?.startMs)
         assertEquals(4500, retrievedTrimmed?.endMs)
         assertTrue(retrievedTrimmed?.isTrimmed == true)
+
+        inMemoryDb.close()
+    }
+
+    @Test
+    fun `test deleted countdown items do not reappear after deletion`() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val inMemoryDb = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
+            .allowMainThreadQueries()
+            .build()
+        val dao = inMemoryDb.countdownDao()
+
+        // Initially seed samples with context
+        AppDatabase.seedSamples(inMemoryDb, context)
+        val initialCount = dao.getCount()
+        assertTrue(initialCount > 0)
+
+        // Delete all items
+        val all = dao.getAllCountdownsSync()
+        for (item in all) {
+            dao.deleteCountdownById(item.id)
+        }
+
+        assertEquals(0, dao.getCount())
+
+        // Re-running seedSamples with context should NOT resurrect the deleted countdowns
+        AppDatabase.seedSamples(inMemoryDb, context)
+        assertEquals(0, dao.getCount())
 
         inMemoryDb.close()
     }

@@ -22,6 +22,6 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "Phone Manager"
+rootProject.name = "Sentry"
 
 include(":app")

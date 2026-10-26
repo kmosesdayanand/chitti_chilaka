@@ -46,7 +46,7 @@
         <receiver
             android:name=".widget.SmallCountdownWidgetReceiver"
             android:exported="true"
-            android:label="Countdown (Small)">
+            android:label="@string/widget_small_label">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
@@ -59,7 +59,7 @@
         <receiver
             android:name=".widget.MediumCountdownWidgetReceiver"
             android:exported="true"
-            android:label="Upcoming Countdowns (Medium)">
+            android:label="@string/widget_medium_label">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
@@ -72,7 +72,7 @@
         <receiver
             android:name=".widget.ProgressCountdownWidgetReceiver"
             android:exported="true"
-            android:label="Countdown Progress Ring (2x2)">
+            android:label="@string/widget_progress_label">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>

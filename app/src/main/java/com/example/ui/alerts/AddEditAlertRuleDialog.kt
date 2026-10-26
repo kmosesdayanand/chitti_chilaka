@@ -13,11 +13,14 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -145,38 +148,51 @@ fun AddEditAlertRuleDialog(
         Surface(
             modifier = Modifier
                 .fillMaxWidth(0.95f)
+                .fillMaxHeight(0.88f)
                 .clip(RoundedCornerShape(24.dp))
                 .testTag("dialog_add_edit_rule"),
             color = DeepSlate900
         ) {
             Column(
-                modifier = Modifier
-                    .padding(20.dp)
-                    .verticalScroll(rememberScrollState())
+                modifier = Modifier.fillMaxSize()
             ) {
-                // Header
-                Text(
-                    text = if (rule == null) "New Battery Alert" else "Edit Battery Alert",
-                    style = MaterialTheme.typography.titleLarge.copy(
-                        color = TextPrimary,
-                        fontWeight = FontWeight.Bold
+                // Fixed Header
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 16.dp)
+                ) {
+                    Text(
+                        text = if (rule == null) "New Battery Alert" else "Edit Battery Alert",
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            color = TextPrimary,
+                            fontWeight = FontWeight.Bold
+                        )
                     )
-                )
-                Text(
-                    text = "Play an audio chime when battery hits your chosen level",
-                    style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Direction Selection
-                Text(
-                    text = "Trigger Condition",
-                    style = MaterialTheme.typography.labelMedium.copy(
-                        color = TextSecondary,
-                        fontWeight = FontWeight.SemiBold
+                    Text(
+                        text = "Play an audio chime when battery hits your chosen level",
+                        style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
                     )
-                )
+                }
+
+                HorizontalDivider(color = SurfaceVariantSlate700.copy(alpha = 0.5f))
+
+                // Scrollable Form Content
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 20.dp, vertical = 14.dp)
+                ) {
+                    // Direction Selection
+                    Text(
+                        text = "Trigger Condition",
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            color = TextSecondary,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    )
                 Spacer(modifier = Modifier.height(6.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -673,12 +689,18 @@ fun AddEditAlertRuleDialog(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(20.dp))
+                }
 
-                // Actions
+                HorizontalDivider(color = SurfaceVariantSlate700.copy(alpha = 0.5f))
+
+                // Fixed Footer Actions
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(DeepSlate900)
+                        .padding(horizontal = 20.dp, vertical = 14.dp),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     TextButton(
                         onClick = {
@@ -690,7 +712,7 @@ fun AddEditAlertRuleDialog(
                         Text("Cancel", color = TextSecondary)
                     }
 
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(10.dp))
 
                     Button(
                         onClick = {

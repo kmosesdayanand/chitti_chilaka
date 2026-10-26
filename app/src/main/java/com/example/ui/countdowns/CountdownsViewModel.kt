@@ -69,7 +69,6 @@ class CountdownsViewModel(application: Application) : AndroidViewModel(applicati
         )
 
         viewModelScope.launch {
-            AppDatabase.seedSamples(db)
             try {
                 CountdownWorker.schedulePeriodicUpdates(application)
                 WidgetUpdater.updateAllWidgets(application)
@@ -160,7 +159,10 @@ class CountdownsViewModel(application: Application) : AndroidViewModel(applicati
     fun confirmDelete() {
         val target = _countdownToDelete.value ?: return
         viewModelScope.launch {
-            repository.delete(target)
+            repository.deleteById(target.id)
+            if (_highlightedId.value == target.id) {
+                _highlightedId.value = null
+            }
             _countdownToDelete.value = null
             WidgetUpdater.updateAllWidgets(getApplication())
         }

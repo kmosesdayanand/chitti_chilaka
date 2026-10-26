@@ -138,6 +138,32 @@ fun AlertsScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
+            // Sentry Screen Header
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = "Sentry",
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            color = CyanPrimary,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.sp
+                        )
+                    )
+                    Text(
+                        text = "Battery Alerts",
+                        style = MaterialTheme.typography.headlineMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary
+                        )
+                    )
+                }
+            }
+
             // Top Battery Status Card
             BatteryHeaderSection(
                 batteryPct = batteryPct,

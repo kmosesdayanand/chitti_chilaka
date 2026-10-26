@@ -7,38 +7,39 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
 private val DarkColorScheme = darkColorScheme(
-    primary = CyanPrimary,
-    onPrimary = DeepSlate950,
-    primaryContainer = Color(0xFF0369A1),
-    onPrimaryContainer = Color(0xFFE0F2FE),
-    secondary = PurpleAccent,
-    onSecondary = Color.White,
-    secondaryContainer = Color(0xFF6B21A8),
-    onSecondaryContainer = Color(0xFFF3E8FF),
+    primary = SentryTealPrimary,
+    onPrimary = SentryNavy950,
+    primaryContainer = SentryTealDeep,
+    onPrimaryContainer = Color(0xFFCCFBF1),
+    secondary = SentryTealGlow,
+    onSecondary = SentryNavy950,
+    secondaryContainer = SentryNavy800,
+    onSecondaryContainer = Color(0xFFE0F2FE),
     tertiary = EmeraldSuccess,
-    onTertiary = DeepSlate950,
-    background = DeepSlate950,
+    onTertiary = SentryNavy950,
+    background = SentryNavy950,
     onBackground = TextPrimary,
-    surface = DeepSlate900,
+    surface = SentryNavy900,
     onSurface = TextPrimary,
-    surfaceVariant = SurfaceSlate800,
+    surfaceVariant = SentryNavy800,
     onSurfaceVariant = TextSecondary,
-    outline = BorderSlate700,
+    outline = SentryNavyBorder,
     error = RoseDanger,
     onError = Color.White
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = Color(0xFF0284C7),
+    primary = Color(0xFF0D9488),
     onPrimary = Color.White,
-    secondary = Color(0xFF7C3AED),
+    secondary = Color(0xFF0369A1),
     tertiary = Color(0xFF059669),
     background = Color(0xFFF8FAFC),
-    onBackground = Color(0xFF0F172A),
+    onBackground = Color(0xFF071438),
     surface = Color.White,
-    onSurface = Color(0xFF0F172A),
+    onSurface = Color(0xFF071438),
     surfaceVariant = Color(0xFFF1F5F9),
-    onSurfaceVariant = Color(0xFF475569)
+    onSurfaceVariant = Color(0xFF334155),
+    outline = Color(0xFFCBD5E1)
 )
 
 @Composable

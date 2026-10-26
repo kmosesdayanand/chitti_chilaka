@@ -1,6 +1,6 @@
 {
-  "name": "Phone Manager",
-  "description": "Personal phone utility app with event countdowns, modular tools, and customizable home screen Glance widgets.",
+  "name": "Sentry",
+  "description": "Sentry - Smart device monitor and utility with battery level audio alerts, event countdowns, and glance widgets.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

@@ -78,54 +78,62 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             MyApplicationTheme(darkTheme = true) {
+                var showSplash by remember { mutableStateOf(true) }
                 var currentScreen by remember { mutableStateOf<Screen>(Screen.Countdowns) }
                 val targetId by pendingCountdownId
 
                 // When an intent with a target countdown arrives, switch to Countdowns tab and highlight
                 LaunchedEffect(targetId) {
                     if (targetId != null && targetId != -1L) {
+                        showSplash = false
                         currentScreen = Screen.Countdowns
                         countdownsViewModel.setHighlightedId(targetId)
                     }
                 }
 
-                // If user is on a placeholder screen, pressing back returns to Countdowns
-                if (currentScreen != Screen.Countdowns) {
-                    BackHandler {
-                        currentScreen = Screen.Countdowns
+                if (showSplash) {
+                    com.example.ui.splash.SentrySplashScreen(
+                        onSplashFinished = { showSplash = false }
+                    )
+                } else {
+                    // If user is on a placeholder screen, pressing back returns to Countdowns
+                    if (currentScreen != Screen.Countdowns) {
+                        BackHandler {
+                            currentScreen = Screen.Countdowns
+                        }
                     }
-                }
 
-                Scaffold(
-                    modifier = Modifier.fillMaxSize(),
-                    containerColor = DeepSlate950,
-                    bottomBar = {
-                        PhoneManagerBottomNav(
-                            currentScreen = currentScreen,
-                            onTabSelected = { selected ->
-                                currentScreen = selected
+                    Scaffold(
+                        modifier = Modifier.fillMaxSize(),
+                        containerColor = DeepSlate950,
+                        bottomBar = {
+                            SentryBottomNav(
+                                currentScreen = currentScreen,
+                                onTabSelected = { selected ->
+                                    currentScreen = selected
+                                }
+                            )
+                        }
+                    ) { innerPadding ->
+                        when (currentScreen) {
+                            Screen.Countdowns -> {
+                                CountdownsScreen(
+                                    viewModel = countdownsViewModel,
+                                    modifier = Modifier.padding(innerPadding)
+                                )
                             }
-                        )
-                    }
-                ) { innerPadding ->
-                    when (currentScreen) {
-                        Screen.Countdowns -> {
-                            CountdownsScreen(
-                                viewModel = countdownsViewModel,
-                                modifier = Modifier.padding(innerPadding)
-                            )
-                        }
-                        Screen.Alerts -> {
-                            AlertsScreen(
-                                viewModel = alertsViewModel,
-                                modifier = Modifier.padding(innerPadding)
-                            )
-                        }
-                        Screen.Contacts -> {
-                            ContactsPlaceholderScreen()
-                        }
-                        Screen.Settings -> {
-                            SettingsPlaceholderScreen()
+                            Screen.Alerts -> {
+                                AlertsScreen(
+                                    viewModel = alertsViewModel,
+                                    modifier = Modifier.padding(innerPadding)
+                                )
+                            }
+                            Screen.Contacts -> {
+                                ContactsPlaceholderScreen()
+                            }
+                            Screen.Settings -> {
+                                SettingsPlaceholderScreen()
+                            }
                         }
                     }
                 }
@@ -149,7 +157,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun PhoneManagerBottomNav(
+fun SentryBottomNav(
     currentScreen: Screen,
     onTabSelected: (Screen) -> Unit
 ) {

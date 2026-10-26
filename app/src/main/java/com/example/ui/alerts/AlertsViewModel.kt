@@ -76,7 +76,6 @@ class AlertsViewModel(application: Application) : AndroidViewModel(application) 
         }
 
         viewModelScope.launch {
-            AppDatabase.seedSamples(db)
             BatteryAlertService.syncWithDatabase(application)
         }
     }

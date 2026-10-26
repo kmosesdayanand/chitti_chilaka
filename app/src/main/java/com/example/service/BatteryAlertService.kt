@@ -163,7 +163,7 @@ class BatteryAlertService : Service() {
         )
 
         return NotificationCompat.Builder(this, CHANNEL_MONITOR)
-            .setContentTitle("Phone Manager")
+            .setContentTitle("Sentry")
             .setContentText("Watching battery level")
             .setSmallIcon(android.R.drawable.ic_lock_idle_charging)
             .setContentIntent(contentPendingIntent)

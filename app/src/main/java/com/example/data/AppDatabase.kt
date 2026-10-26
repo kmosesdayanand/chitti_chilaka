@@ -17,13 +17,18 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun alertRuleDao(): AlertRuleDao
 
     companion object {
+        const val PREFS_SEEDS = "phone_manager_seeds"
+        const val KEY_COUNTDOWNS_SEEDED = "countdowns_initial_seeded"
+        const val KEY_ALERTS_SEEDED = "alerts_initial_seeded"
+
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
+                val appContext = context.applicationContext
                 val instance = Room.databaseBuilder(
-                    context.applicationContext,
+                    appContext,
                     AppDatabase::class.java,
                     "phone_manager_db"
                 )
@@ -32,14 +37,7 @@ abstract class AppDatabase : RoomDatabase() {
                     override fun onCreate(db: SupportSQLiteDatabase) {
                         super.onCreate(db)
                         CoroutineScope(Dispatchers.IO).launch {
-                            seedSamples(getInstance(context.applicationContext))
-                        }
-                    }
-
-                    override fun onOpen(db: SupportSQLiteDatabase) {
-                        super.onOpen(db)
-                        CoroutineScope(Dispatchers.IO).launch {
-                            seedSamples(getInstance(context.applicationContext))
+                            seedSamples(getInstance(appContext), appContext)
                         }
                     }
                 })
@@ -49,103 +47,39 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
-        suspend fun seedSamples(database: AppDatabase) {
+        suspend fun seedSamples(
+            database: AppDatabase,
+            context: Context? = null,
+            force: Boolean = false
+        ) {
+            val prefs = context?.getSharedPreferences(PREFS_SEEDS, Context.MODE_PRIVATE)
+            val hasSeededCountdowns = prefs?.getBoolean(KEY_COUNTDOWNS_SEEDED, false) ?: false
             val countdownDao = database.countdownDao()
-            if (countdownDao.getCount() == 0) {
-                val now = System.currentTimeMillis()
-                val dayMs = 86400000L
+            val alertDao = database.alertRuleDao()
 
-                val nextNewYear = Calendar.getInstance().apply {
-                    set(Calendar.YEAR, get(Calendar.YEAR) + 1)
-                    set(Calendar.MONTH, Calendar.JANUARY)
-                    set(Calendar.DAY_OF_MONTH, 1)
-                    set(Calendar.HOUR_OF_DAY, 0)
-                    set(Calendar.MINUTE, 0)
-                    set(Calendar.SECOND, 0)
-                    set(Calendar.MILLISECOND, 0)
-                }.timeInMillis
-
-                val samples = listOf(
-                    Countdown(
-                        title = "New Year's Eve Celebration",
-                        targetTimeMillis = nextNewYear,
-                        createdTimeMillis = now - dayMs * 20,
-                        emoji = "🎆",
-                        colorHex = "#A855F7",
-                        notes = "Welcome the new year with friends and family!",
-                        category = "Holiday",
-                        cardStyle = "modern",
-                        displayUnit = "all"
-                    ),
-                    Countdown(
-                        title = "Summer Road Trip & Camping",
-                        targetTimeMillis = now + dayMs * 14 + 18000000L,
-                        createdTimeMillis = now - dayMs * 5,
-                        emoji = "🏕️",
-                        colorHex = "#38BDF8",
-                        notes = "Tent, camping gear, camera, and hiking boots.",
-                        category = "Trip",
-                        cardStyle = "tinted",
-                        displayUnit = "all"
-                    ),
-                    Countdown(
-                        title = "Product Launch & Keynote",
-                        targetTimeMillis = now + dayMs * 4 + 3600000L * 7,
-                        createdTimeMillis = now - dayMs * 10,
-                        emoji = "🚀",
-                        colorHex = "#10B981",
-                        notes = "Team demo and release announcement livestream.",
-                        category = "Work",
-                        cardStyle = "modern",
-                        displayUnit = "hours"
-                    ),
-                    Countdown(
-                        title = "Sarah's Surprise Birthday",
-                        targetTimeMillis = now + dayMs * 28 + 3600000L * 14,
-                        createdTimeMillis = now - dayMs * 3,
-                        emoji = "🎂",
-                        colorHex = "#FB7185",
-                        notes = "Order customized cake and balloons.",
-                        category = "Birthday",
-                        cardStyle = "tinted",
-                        displayUnit = "days"
-                    ),
-                    Countdown(
-                        title = "College Graduation Day",
-                        targetTimeMillis = now - dayMs * 35,
-                        createdTimeMillis = now - dayMs * 120,
-                        emoji = "🎓",
-                        colorHex = "#94A3B8",
-                        notes = "A memorable milestone accomplished.",
-                        category = "Milestone",
-                        cardStyle = "minimal",
-                        displayUnit = "all"
-                    )
-                )
-
-                samples.forEach { countdownDao.insertCountdown(it) }
+            // Countdowns: seed ONLY on fresh creation or in test environments where force/null context is used
+            if (force || (context == null && countdownDao.getCount() == 0)) {
+                if (countdownDao.getCount() == 0) {
+                    insertDefaultCountdowns(countdownDao)
+                }
+            } else if (prefs != null && !hasSeededCountdowns) {
+                if (countdownDao.getCount() == 0) {
+                    insertDefaultCountdowns(countdownDao)
+                }
+                prefs.edit().putBoolean(KEY_COUNTDOWNS_SEEDED, true).apply()
             }
 
-            val alertDao = database.alertRuleDao()
-            if (alertDao.getCount() == 0) {
-                alertDao.insertRule(
-                    AlertRule(
-                        level = 80,
-                        direction = AlertRule.DIRECTION_CHARGING_UP,
-                        soundType = AlertRule.SOUND_VOICE_CHARGED,
-                        volume = 0.8f,
-                        enabled = true
-                    )
-                )
-                alertDao.insertRule(
-                    AlertRule(
-                        level = 20,
-                        direction = AlertRule.DIRECTION_DRAINING_DOWN,
-                        soundType = AlertRule.SOUND_VOICE_ALERT,
-                        volume = 0.8f,
-                        enabled = true
-                    )
-                )
+            // Battery Alert Rules: seed ONLY on fresh creation
+            val hasSeededAlerts = prefs?.getBoolean(KEY_ALERTS_SEEDED, false) ?: false
+            if (force || (context == null && alertDao.getCount() == 0)) {
+                if (alertDao.getCount() == 0) {
+                    insertDefaultAlertRules(alertDao)
+                }
+            } else if (prefs != null && !hasSeededAlerts) {
+                if (alertDao.getCount() == 0) {
+                    insertDefaultAlertRules(alertDao)
+                }
+                prefs.edit().putBoolean(KEY_ALERTS_SEEDED, true).apply()
             } else {
                 alertDao.updateSoundTypeForDirection(
                     direction = AlertRule.DIRECTION_DRAINING_DOWN,
@@ -156,6 +90,102 @@ abstract class AppDatabase : RoomDatabase() {
                     newSoundType = AlertRule.SOUND_VOICE_CHARGED
                 )
             }
+        }
+
+        private suspend fun insertDefaultCountdowns(countdownDao: CountdownDao) {
+            val now = System.currentTimeMillis()
+            val dayMs = 86400000L
+
+            val nextNewYear = Calendar.getInstance().apply {
+                set(Calendar.YEAR, get(Calendar.YEAR) + 1)
+                set(Calendar.MONTH, Calendar.JANUARY)
+                set(Calendar.DAY_OF_MONTH, 1)
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }.timeInMillis
+
+            val samples = listOf(
+                Countdown(
+                    title = "New Year's Eve Celebration",
+                    targetTimeMillis = nextNewYear,
+                    createdTimeMillis = now - dayMs * 20,
+                    emoji = "🎆",
+                    colorHex = "#A855F7",
+                    notes = "Welcome the new year with friends and family!",
+                    category = "Holiday",
+                    cardStyle = "modern",
+                    displayUnit = "all"
+                ),
+                Countdown(
+                    title = "Summer Road Trip & Camping",
+                    targetTimeMillis = now + dayMs * 14 + 18000000L,
+                    createdTimeMillis = now - dayMs * 5,
+                    emoji = "🏕️",
+                    colorHex = "#38BDF8",
+                    notes = "Tent, camping gear, camera, and hiking boots.",
+                    category = "Trip",
+                    cardStyle = "tinted",
+                    displayUnit = "all"
+                ),
+                Countdown(
+                    title = "Product Launch & Keynote",
+                    targetTimeMillis = now + dayMs * 4 + 3600000L * 7,
+                    createdTimeMillis = now - dayMs * 10,
+                    emoji = "🚀",
+                    colorHex = "#10B981",
+                    notes = "Team demo and release announcement livestream.",
+                    category = "Work",
+                    cardStyle = "modern",
+                    displayUnit = "hours"
+                ),
+                Countdown(
+                    title = "Sarah's Surprise Birthday",
+                    targetTimeMillis = now + dayMs * 28 + 3600000L * 14,
+                    createdTimeMillis = now - dayMs * 3,
+                    emoji = "🎂",
+                    colorHex = "#FB7185",
+                    notes = "Order customized cake and balloons.",
+                    category = "Birthday",
+                    cardStyle = "tinted",
+                    displayUnit = "days"
+                ),
+                Countdown(
+                    title = "College Graduation Day",
+                    targetTimeMillis = now - dayMs * 35,
+                    createdTimeMillis = now - dayMs * 120,
+                    emoji = "🎓",
+                    colorHex = "#94A3B8",
+                    notes = "A memorable milestone accomplished.",
+                    category = "Milestone",
+                    cardStyle = "minimal",
+                    displayUnit = "all"
+                )
+            )
+
+            samples.forEach { countdownDao.insertCountdown(it) }
+        }
+
+        private suspend fun insertDefaultAlertRules(alertDao: AlertRuleDao) {
+            alertDao.insertRule(
+                AlertRule(
+                    level = 80,
+                    direction = AlertRule.DIRECTION_CHARGING_UP,
+                    soundType = AlertRule.SOUND_VOICE_CHARGED,
+                    volume = 0.8f,
+                    enabled = true
+                )
+            )
+            alertDao.insertRule(
+                AlertRule(
+                    level = 20,
+                    direction = AlertRule.DIRECTION_DRAINING_DOWN,
+                    soundType = AlertRule.SOUND_VOICE_ALERT,
+                    volume = 0.8f,
+                    enabled = true
+                )
+            )
         }
     }
 }

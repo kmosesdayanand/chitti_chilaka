@@ -3,6 +3,6 @@
     <item
         android:width="66dp"
         android:height="66dp"
-        android:drawable="@drawable/ic_phone_manager_1792836010435"
+        android:drawable="@drawable/sentry_symbol_foreground"
         android:gravity="center" />
 </layer-list>

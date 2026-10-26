@@ -1,8 +1,11 @@
 <resources>
-    <string name="app_name">Phone Manager</string>
-    <string name="widget_small_desc">Displays days left and emoji for a selected countdown event.</string>
-    <string name="widget_medium_desc">Displays the next 3 upcoming countdowns in a list.</string>
-    <string name="widget_progress_desc">Displays an elapsed progress ring and remaining time for a countdown.</string>
+    <string name="app_name">Sentry</string>
+    <string name="widget_small_label">Sentry Countdown (Small)</string>
+    <string name="widget_medium_label">Sentry Upcoming Countdowns</string>
+    <string name="widget_progress_label">Sentry Progress Ring (2x2)</string>
+    <string name="widget_small_desc">Displays days left and emoji for a selected countdown event in Sentry.</string>
+    <string name="widget_medium_desc">Displays the next 3 upcoming countdowns in Sentry.</string>
+    <string name="widget_progress_desc">Displays an elapsed progress ring and remaining time for a countdown in Sentry.</string>
     
     <!-- Tab Titles -->
     <string name="tab_countdowns">Countdowns</string>

@@ -316,7 +316,7 @@ private fun CountdownHeaderSection(
     ) {
         Column {
             Text(
-                text = "Phone Manager",
+                text = "Sentry",
                 style = MaterialTheme.typography.labelMedium.copy(
                     color = CyanPrimary,
                     fontWeight = FontWeight.Bold,

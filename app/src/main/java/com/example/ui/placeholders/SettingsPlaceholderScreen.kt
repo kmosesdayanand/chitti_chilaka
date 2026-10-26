@@ -181,7 +181,7 @@ fun SettingsPlaceholderScreen() {
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
-                    text = "Phone Manager",
+                    text = "Sentry",
                     style = MaterialTheme.typography.titleMedium.copy(
                         fontWeight = FontWeight.Bold,
                         color = TextPrimary
