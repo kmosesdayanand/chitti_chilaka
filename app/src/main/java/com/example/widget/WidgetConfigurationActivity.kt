@@ -15,10 +15,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -36,7 +39,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -96,13 +98,17 @@ class WidgetConfigurationActivity : ComponentActivity() {
         setContent {
             val systemDark = androidx.compose.foundation.isSystemInDarkTheme()
             val themeMode = WidgetPreferences.getThemeMode(this@WidgetConfigurationActivity)
+            val dynamicColor = WidgetPreferences.getDynamicColor(this@WidgetConfigurationActivity)
             val isDark = when (themeMode) {
                 "DARK" -> true
                 "LIGHT" -> false
                 else -> systemDark
             }
 
-            MyApplicationTheme(darkTheme = isDark) {
+            MyApplicationTheme(
+                darkTheme = isDark,
+                dynamicColor = dynamicColor
+            ) {
                 val coroutineScope = rememberCoroutineScope()
                 var countdowns by remember { mutableStateOf<List<Countdown>?>(null) }
                 var tapOpensItem by remember {
@@ -120,6 +126,7 @@ class WidgetConfigurationActivity : ComponentActivity() {
                 }
 
                 Scaffold(
+                    contentWindowInsets = WindowInsets.safeDrawing,
                     topBar = {
                         TopAppBar(
                             title = {
@@ -137,7 +144,9 @@ class WidgetConfigurationActivity : ComponentActivity() {
                             navigationIcon = {
                                 IconButton(
                                     onClick = { finish() },
-                                    modifier = Modifier.testTag("config_close_button")
+                                    modifier = Modifier
+                                        .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+                                        .testTag("config_close_button")
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.Close,
@@ -186,7 +195,7 @@ class WidgetConfigurationActivity : ComponentActivity() {
                                             .fillMaxWidth()
                                             .padding(bottom = 6.dp),
                                         shape = RoundedCornerShape(14.dp),
-                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
                                     ) {
                                         Row(
                                             modifier = Modifier
@@ -228,10 +237,7 @@ class WidgetConfigurationActivity : ComponentActivity() {
                                                         WidgetUpdater.updateAllWidgets(this@WidgetConfigurationActivity)
                                                     }
                                                 },
-                                                colors = SwitchDefaults.colors(
-                                                    checkedThumbColor = Color.White,
-                                                    checkedTrackColor = MaterialTheme.colorScheme.primary
-                                                )
+                                                modifier = Modifier.testTag("switch_widget_tap_item")
                                             )
                                         }
                                     }
@@ -315,7 +321,7 @@ private fun CountdownSelectionItem(
         try {
             Color(android.graphics.Color.parseColor(countdown.colorHex))
         } catch (e: Exception) {
-            Color(0xFF38BDF8)
+            Color(0xFF00E5D0)
         }
     }
 
@@ -330,10 +336,11 @@ private fun CountdownSelectionItem(
     Card(
         modifier = Modifier
             .fillMaxWidth()
+            .defaultMinSize(minHeight = 56.dp)
             .clickable(onClick = onClick)
             .testTag("select_countdown_${countdown.id}"),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B))
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
     ) {
         Row(
             modifier = Modifier
@@ -358,7 +365,7 @@ private fun CountdownSelectionItem(
                     Text(
                         text = countdown.title,
                         style = MaterialTheme.typography.titleMedium.copy(
-                            color = Color(0xFFF1F5F9),
+                            color = MaterialTheme.colorScheme.onSurface,
                             fontWeight = FontWeight.Bold
                         ),
                         maxLines = 1
@@ -382,7 +389,7 @@ private fun CountdownSelectionItem(
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = TimeFormatUtils.formatDate(countdown.targetTimeMillis),
-                    style = MaterialTheme.typography.bodySmall.copy(color = Color(0xFF94A3B8))
+                    style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
                 )
             }
 
@@ -391,13 +398,19 @@ private fun CountdownSelectionItem(
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(8.dp))
-                    .background(if (timeRemaining.isPast) Color(0xFF334155) else accentColor.copy(alpha = 0.25f))
+                    .background(
+                        if (timeRemaining.isPast) {
+                            MaterialTheme.colorScheme.surfaceVariant
+                        } else {
+                            accentColor.copy(alpha = 0.25f)
+                        }
+                    )
                     .padding(horizontal = 8.dp, vertical = 4.dp)
             ) {
                 Text(
                     text = timeRemaining.customDisplaySummary,
                     style = MaterialTheme.typography.labelSmall.copy(
-                        color = if (timeRemaining.isPast) Color(0xFF94A3B8) else accentColor,
+                        color = if (timeRemaining.isPast) MaterialTheme.colorScheme.onSurfaceVariant else accentColor,
                         fontWeight = FontWeight.Bold
                     )
                 )

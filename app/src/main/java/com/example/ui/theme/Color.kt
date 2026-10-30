@@ -1,61 +1,74 @@
 package com.example.ui.theme
 
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.graphics.Color
 
-// Sentry Navy & Teal Brand Palette
+// Fixed Sentry Navy & Teal Brand Palette (Used for fallback schemes, splash screen, and brand logo)
 val SentryNavy950 = Color(0xFF020B24) // Midnight navy screen background
 val SentryNavy900 = Color(0xFF07143B) // Card & sheet container navy
 val SentryNavy800 = Color(0xFF0E2259) // Elevated component navy
 val SentryNavy700 = Color(0xFF17357A) // Surface variant
 val SentryNavyBorder = Color(0xFF1C3D88) // Subtle navy border
 
-// Adaptive surface and text colors that automatically follow system/app theme
-val DeepSlate950: Color
-    @Composable
-    get() = if (LocalIsDarkTheme.current) SentryNavy950 else Color(0xFFF1F5F9)
-
-val DeepSlate900: Color
-    @Composable
-    get() = if (LocalIsDarkTheme.current) SentryNavy900 else Color(0xFFFFFFFF)
-
-val SurfaceSlate800: Color
-    @Composable
-    get() = if (LocalIsDarkTheme.current) SentryNavy800 else Color(0xFFE2E8F0)
-
-val SurfaceVariantSlate700: Color
-    @Composable
-    get() = if (LocalIsDarkTheme.current) SentryNavy700 else Color(0xFFCBD5E1)
-
-val BorderSlate700: Color
-    @Composable
-    get() = if (LocalIsDarkTheme.current) SentryNavyBorder else Color(0xFFE2E8F0)
-
-val TextPrimary: Color
-    @Composable
-    get() = if (LocalIsDarkTheme.current) Color(0xFFF8FAFC) else Color(0xFF0F172A)
-
-val TextSecondary: Color
-    @Composable
-    get() = if (LocalIsDarkTheme.current) Color(0xFF94A3B8) else Color(0xFF475569)
-
-val TextMuted: Color
-    @Composable
-    get() = if (LocalIsDarkTheme.current) Color(0xFF64748B) else Color(0xFF94A3B8)
-
-// Brand Teals (Luminous Sentry glow and ribbon accents)
 val SentryTealPrimary = Color(0xFF00E5D0) // Glowing vibrant teal
 val SentryTealGlow = Color(0xFF01FDE9) // Neon teal spark
 val SentryTealDeep = Color(0xFF0180AF) // Deep logo teal
 
-// Primary Accent
-val CyanPrimary = SentryTealPrimary
-val PurpleAccent = Color(0xFFA855F7)
+// Semantic status colors carrying explicit meaning
 val EmeraldSuccess = Color(0xFF10B981)
 val RoseDanger = Color(0xFFFB7185)
 val AmberWarning = Color(0xFFFBBF24)
+val PurpleAccent = Color(0xFFA855F7)
 
-// 12 curated vibrant colors for full customization
+// Dynamic ColorScheme Getters: Automatically bind to Material 3 / Material You system theme
+val DeepSlate950: Color
+    @Composable
+    @ReadOnlyComposable
+    get() = MaterialTheme.colorScheme.background
+
+val DeepSlate900: Color
+    @Composable
+    @ReadOnlyComposable
+    get() = MaterialTheme.colorScheme.surface
+
+val SurfaceSlate800: Color
+    @Composable
+    @ReadOnlyComposable
+    get() = MaterialTheme.colorScheme.surfaceContainerHigh
+
+val SurfaceVariantSlate700: Color
+    @Composable
+    @ReadOnlyComposable
+    get() = MaterialTheme.colorScheme.surfaceVariant
+
+val BorderSlate700: Color
+    @Composable
+    @ReadOnlyComposable
+    get() = MaterialTheme.colorScheme.outlineVariant
+
+val TextPrimary: Color
+    @Composable
+    @ReadOnlyComposable
+    get() = MaterialTheme.colorScheme.onSurface
+
+val TextSecondary: Color
+    @Composable
+    @ReadOnlyComposable
+    get() = MaterialTheme.colorScheme.onSurfaceVariant
+
+val TextMuted: Color
+    @Composable
+    @ReadOnlyComposable
+    get() = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+
+val CyanPrimary: Color
+    @Composable
+    @ReadOnlyComposable
+    get() = MaterialTheme.colorScheme.primary
+
+// 12 curated vibrant colors for full user customization
 val CountdownColors = listOf(
     "#00E5D0", // Sentry Luminous Teal
     "#0180AF", // Sentry Ocean Teal

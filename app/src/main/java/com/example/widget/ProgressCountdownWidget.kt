@@ -1,9 +1,12 @@
 package com.example.widget
 
 import android.content.Context
+import android.os.Build
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.datastore.preferences.core.Preferences
@@ -11,6 +14,7 @@ import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.Image
 import androidx.glance.ImageProvider
+import androidx.glance.LocalSize
 import androidx.glance.action.ActionParameters
 import androidx.glance.action.actionParametersOf
 import androidx.glance.action.actionStartActivity
@@ -19,6 +23,7 @@ import androidx.glance.appwidget.AppWidgetId
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
+import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.provideContent
 import androidx.glance.appwidget.state.getAppWidgetState
@@ -32,6 +37,7 @@ import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.height
 import androidx.glance.layout.padding
 import androidx.glance.layout.size
+import androidx.glance.GlanceTheme
 import androidx.glance.state.GlanceStateDefinition
 import androidx.glance.state.PreferencesGlanceStateDefinition
 import androidx.glance.text.FontWeight
@@ -49,6 +55,13 @@ private val COUNTDOWN_ID_KEY = ActionParameters.Key<Long>("EXTRA_COUNTDOWN_ID")
 class ProgressCountdownWidget : GlanceAppWidget() {
 
     override val stateDefinition: GlanceStateDefinition<*> = PreferencesGlanceStateDefinition
+    override val sizeMode: SizeMode = SizeMode.Responsive(
+        setOf(
+            DpSize(110.dp, 110.dp),
+            DpSize(160.dp, 160.dp),
+            DpSize(240.dp, 240.dp)
+        )
+    )
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val appWidgetId: Int = when (id) {
@@ -73,12 +86,14 @@ class ProgressCountdownWidget : GlanceAppWidget() {
             val countdown by produceState<Countdown?>(initial, stateId, tick) {
                 value = WidgetDataLoader.loadCountdown(context, appWidgetId, stateId)
             }
-            ProgressWidgetContent(context = context, countdown = countdown)
+            GlanceTheme {
+                ProgressWidgetContent(context = context, countdown = countdown)
+            }
         }
     }
 }
 
-@androidx.compose.runtime.Composable
+@Composable
 private fun ProgressWidgetContent(context: Context, countdown: Countdown?) {
     val opensItem = WidgetPreferences.isWidgetTapOpensItemEnabled(context)
     val clickAction = if (countdown != null && opensItem) {
@@ -87,27 +102,32 @@ private fun ProgressWidgetContent(context: Context, countdown: Countdown?) {
         actionStartActivity<MainActivity>()
     }
 
-    val backgroundColor = Color(0xFF0F172A)
-
     if (countdown == null) {
         Box(
             modifier = GlanceModifier
                 .fillMaxSize()
-                .background(ColorProvider(backgroundColor))
+                .background(GlanceTheme.colors.surface)
                 .cornerRadius(18.dp)
                 .padding(14.dp)
                 .clickable(clickAction),
             contentAlignment = Alignment.Center
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(text = "⏳", style = TextStyle(fontSize = 32.sp))
+                Text(text = "⏳", style = TextStyle(fontSize = 30.sp))
                 Spacer(modifier = GlanceModifier.height(6.dp))
                 Text(
                     text = "No countdowns",
                     style = TextStyle(
-                        color = ColorProvider(Color(0xFFE2E8F0)),
+                        color = GlanceTheme.colors.onSurface,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold
+                    )
+                )
+                Text(
+                    text = "Tap to setup",
+                    style = TextStyle(
+                        color = GlanceTheme.colors.onSurfaceVariant,
+                        fontSize = 11.sp
                     )
                 )
             }
@@ -124,21 +144,42 @@ private fun ProgressWidgetContent(context: Context, countdown: Countdown?) {
     val accentColor = try {
         Color(android.graphics.Color.parseColor(countdown.colorHex))
     } catch (e: Exception) {
-        Color(0xFF38BDF8)
+        Color(0xFF00E5D0)
+    }
+
+    val ringColorInt = try {
+        android.graphics.Color.parseColor(countdown.colorHex)
+    } catch (e: Exception) {
+        if (Build.VERSION.SDK_INT >= 31) {
+            context.getColor(android.R.color.system_accent1_500)
+        } else {
+            0xFF00E5D0.toInt()
+        }
+    }
+
+    val trackColorInt = if (Build.VERSION.SDK_INT >= 31) {
+        try {
+            context.getColor(android.R.color.system_neutral2_700)
+        } catch (e: Exception) {
+            android.graphics.Color.argb(45, android.graphics.Color.red(ringColorInt), android.graphics.Color.green(ringColorInt), android.graphics.Color.blue(ringColorInt))
+        }
+    } else {
+        android.graphics.Color.argb(45, android.graphics.Color.red(ringColorInt), android.graphics.Color.green(ringColorInt), android.graphics.Color.blue(ringColorInt))
     }
 
     val progressPercent = (timeRemaining.progress * 100).toInt()
     val ringBitmap = RingBitmapUtil.createProgressRingBitmap(
         progress = timeRemaining.progress,
-        colorHex = countdown.colorHex,
-        sizePx = 200,
+        ringColor = ringColorInt,
+        trackColor = trackColorInt,
+        sizePx = 220,
         strokeWidthPx = 18f
     )
 
     Box(
         modifier = GlanceModifier
             .fillMaxSize()
-            .background(ColorProvider(backgroundColor))
+            .background(GlanceTheme.colors.surface)
             .cornerRadius(18.dp)
             .padding(10.dp)
             .clickable(clickAction),
@@ -154,7 +195,7 @@ private fun ProgressWidgetContent(context: Context, countdown: Countdown?) {
                 text = countdown.title,
                 maxLines = 1,
                 style = TextStyle(
-                    color = ColorProvider(Color(0xFFF1F5F9)),
+                    color = GlanceTheme.colors.onSurface,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center
@@ -165,7 +206,7 @@ private fun ProgressWidgetContent(context: Context, countdown: Countdown?) {
 
             // Ring container with emoji and percentage overlay
             Box(
-                modifier = GlanceModifier.size(88.dp),
+                modifier = GlanceModifier.size(86.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Image(
@@ -185,7 +226,7 @@ private fun ProgressWidgetContent(context: Context, countdown: Countdown?) {
                     Text(
                         text = "$progressPercent%",
                         style = TextStyle(
-                            color = ColorProvider(if (timeRemaining.isPast) Color(0xFF94A3B8) else accentColor),
+                            color = if (timeRemaining.isPast) GlanceTheme.colors.onSurfaceVariant else ColorProvider(accentColor),
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -205,7 +246,7 @@ private fun ProgressWidgetContent(context: Context, countdown: Countdown?) {
                     timeRemaining.badgeText
                 },
                 style = TextStyle(
-                    color = ColorProvider(if (timeRemaining.isPast) Color(0xFF64748B) else Color(0xFFCBD5E1)),
+                    color = if (timeRemaining.isPast) GlanceTheme.colors.onSurfaceVariant else GlanceTheme.colors.onSurface,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Medium,
                     textAlign = TextAlign.Center

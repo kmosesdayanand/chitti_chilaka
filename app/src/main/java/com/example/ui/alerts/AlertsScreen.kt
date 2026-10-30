@@ -24,7 +24,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.BatteryAlert
 import androidx.compose.material.icons.filled.BatteryChargingFull
 import androidx.compose.material.icons.filled.BatteryStd
@@ -37,17 +36,20 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.tooling.preview.Devices
+import androidx.compose.ui.tooling.preview.Preview
+import com.example.ui.theme.MyApplicationTheme
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -99,39 +101,11 @@ fun AlertsScreen(
         }
     }
 
-    fun handleAddRuleClick() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            val hasPermission = ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.POST_NOTIFICATIONS
-            ) == PackageManager.PERMISSION_GRANTED
-            if (!hasPermission) {
-                permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-            }
-        }
-        viewModel.openAddDialog()
-    }
-
     Scaffold(
         modifier = modifier
             .fillMaxSize()
             .testTag("screen_alerts"),
-        containerColor = DeepSlate950,
-        floatingActionButton = {
-            androidx.compose.material3.FloatingActionButton(
-                onClick = { handleAddRuleClick() },
-                containerColor = CyanPrimary,
-                contentColor = DeepSlate900,
-                shape = CircleShape,
-                modifier = Modifier.testTag("btn_add_alert_rule")
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = "Add Rule",
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-        }
+        containerColor = DeepSlate950
     ) { innerPadding ->
         Column(
             modifier = Modifier
@@ -216,11 +190,11 @@ fun AlertsScreen(
 
             // Rules List or Empty State
             if (rules.isEmpty()) {
-                EmptyAlertsState(onAddNew = { handleAddRuleClick() })
+                EmptyAlertsState()
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 96.dp),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     items(rules, key = { it.id }) { rule ->
@@ -230,7 +204,18 @@ fun AlertsScreen(
                             onTap = { viewModel.openEditDialog(rule) },
                             onLongPress = { viewModel.requestDelete(rule) },
                             onSwipeDelete = { viewModel.requestDelete(rule) },
-                            onToggle = { enabled -> viewModel.toggleRule(rule, enabled) },
+                            onToggle = { enabled ->
+                                if (enabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                    val hasPermission = ContextCompat.checkSelfPermission(
+                                        context,
+                                        Manifest.permission.POST_NOTIFICATIONS
+                                    ) == PackageManager.PERMISSION_GRANTED
+                                    if (!hasPermission) {
+                                        permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                    }
+                                }
+                                viewModel.toggleRule(rule, enabled)
+                            },
                             onTestSound = {
                                 viewModel.testSound(
                                     ruleId = rule.id,
@@ -424,7 +409,7 @@ private fun BatteryHeaderSection(
 }
 
 @Composable
-private fun EmptyAlertsState(onAddNew: () -> Unit) {
+private fun EmptyAlertsState() {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -451,7 +436,7 @@ private fun EmptyAlertsState(onAddNew: () -> Unit) {
         Spacer(modifier = Modifier.height(18.dp))
 
         Text(
-            text = "No Battery Alerts Yet",
+            text = "No Battery Alerts Configured",
             style = MaterialTheme.typography.titleMedium.copy(
                 fontWeight = FontWeight.Bold,
                 color = TextPrimary
@@ -461,34 +446,42 @@ private fun EmptyAlertsState(onAddNew: () -> Unit) {
         Spacer(modifier = Modifier.height(6.dp))
 
         Text(
-            text = "Set an alert to play a chime when charging reaches 80% or battery drops to 20%.",
+            text = "Audio alerts notify you when battery charging reaches target thresholds or battery drops.",
             style = MaterialTheme.typography.bodyMedium.copy(
                 color = TextSecondary,
                 lineHeight = 20.sp
             ),
             textAlign = TextAlign.Center
         )
+    }
+}
 
-        Spacer(modifier = Modifier.height(20.dp))
+@Preview(name = "Compact Phone (OnePlus Nord 6)", device = "spec:width=411dp,height=914dp", showBackground = true)
+@Composable
+private fun AlertsScreenCompactPreview() {
+    MyApplicationTheme(darkTheme = true) {
+        Surface(color = DeepSlate950) {
+            BatteryHeaderSection(batteryPct = 82, isCharging = true, activeRulesCount = 3)
+        }
+    }
+}
 
-        Button(
-            onClick = onAddNew,
-            colors = ButtonDefaults.buttonColors(containerColor = CyanPrimary),
-            shape = RoundedCornerShape(12.dp),
-            modifier = Modifier.testTag("btn_empty_add_rule")
-        ) {
-            Icon(
-                imageVector = Icons.Default.Add,
-                contentDescription = null,
-                tint = DeepSlate900,
-                modifier = Modifier.size(18.dp)
-            )
-            Spacer(modifier = Modifier.width(6.dp))
-            Text(
-                text = "Add Battery Alert",
-                color = DeepSlate900,
-                fontWeight = FontWeight.Bold
-            )
+@Preview(name = "Landscape Phone", device = "spec:width=914dp,height=411dp", showBackground = true)
+@Composable
+private fun AlertsScreenLandscapePreview() {
+    MyApplicationTheme(darkTheme = true) {
+        Surface(color = DeepSlate950) {
+            BatteryHeaderSection(batteryPct = 82, isCharging = true, activeRulesCount = 3)
+        }
+    }
+}
+
+@Preview(name = "Tablet", device = Devices.TABLET, showBackground = true)
+@Composable
+private fun AlertsScreenTabletPreview() {
+    MyApplicationTheme(darkTheme = true) {
+        Surface(color = DeepSlate950) {
+            BatteryHeaderSection(batteryPct = 82, isCharging = true, activeRulesCount = 3)
         }
     }
 }

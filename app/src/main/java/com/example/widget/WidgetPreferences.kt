@@ -70,6 +70,7 @@ object WidgetPreferences {
 
     const val KEY_WIDGET_TAP_OPENS_ITEM = "widget_tap_opens_item"
     const val KEY_THEME_MODE = "app_theme_mode" // "SYSTEM", "DARK", "LIGHT"
+    const val KEY_DYNAMIC_COLOR = "app_dynamic_color"
 
     fun isWidgetTapOpensItemEnabled(context: Context): Boolean {
         return getPrefs(context).getBoolean(KEY_WIDGET_TAP_OPENS_ITEM, true)
@@ -88,6 +89,16 @@ object WidgetPreferences {
     fun setThemeMode(context: Context, mode: String) {
         getPrefs(context).edit()
             .putString(KEY_THEME_MODE, mode)
+            .commit()
+    }
+
+    fun getDynamicColor(context: Context): Boolean {
+        return getPrefs(context).getBoolean(KEY_DYNAMIC_COLOR, true)
+    }
+
+    fun setDynamicColor(context: Context, enabled: Boolean) {
+        getPrefs(context).edit()
+            .putBoolean(KEY_DYNAMIC_COLOR, enabled)
             .commit()
     }
 }

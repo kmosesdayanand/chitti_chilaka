@@ -19,11 +19,16 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Surface
+import androidx.compose.ui.tooling.preview.Devices
+import androidx.compose.ui.tooling.preview.Preview
+import com.example.ui.theme.MyApplicationTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Sort
@@ -110,7 +115,7 @@ fun CountdownsScreen(
     val countdownToDelete by viewModel.countdownToDelete.collectAsStateWithLifecycle()
     val highlightedId by viewModel.highlightedId.collectAsStateWithLifecycle()
 
-    val listState = rememberLazyListState()
+    val gridState = rememberLazyGridState()
 
     var currentTickerTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) {
@@ -125,7 +130,7 @@ fun CountdownsScreen(
         if (target != null && target != -1L) {
             val index = countdowns.indexOfFirst { it.id == target }
             if (index >= 0) {
-                listState.animateScrollToItem(index)
+                gridState.animateScrollToItem(index)
             }
         }
     }
@@ -209,10 +214,12 @@ fun CountdownsScreen(
                     onAddNew = { viewModel.openAddDialog() }
                 )
             } else {
-                LazyColumn(
-                    state = listState,
+                LazyVerticalGrid(
+                    columns = GridCells.Adaptive(minSize = 340.dp),
+                    state = gridState,
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 88.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     items(countdowns, key = { it.id }) { item ->
@@ -651,17 +658,18 @@ private fun CountdownCardContent(
         )
     }
 
-    val accentColor = remember(countdown.colorHex) {
+    val fallbackPrimary = CyanPrimary
+    val accentColor = remember(countdown.colorHex, fallbackPrimary) {
         try {
             Color(android.graphics.Color.parseColor(countdown.colorHex))
         } catch (e: Exception) {
-            CyanPrimary
+            fallbackPrimary
         }
     }
 
     // Dynamic background based on cardStyle
     val cardBackground = when {
-        timeRemaining.isPast -> Color(0xFF161F30)
+        timeRemaining.isPast -> MaterialTheme.colorScheme.surfaceVariant
         countdown.cardStyle == "tinted" -> accentColor.copy(alpha = 0.12f)
         countdown.cardStyle == "minimal" -> DeepSlate900
         else -> SurfaceSlate800
@@ -705,7 +713,7 @@ private fun CountdownCardContent(
                         .size(46.dp)
                         .clip(CircleShape)
                         .background(
-                            if (timeRemaining.isPast) Color(0xFF334155).copy(alpha = 0.5f)
+                            if (timeRemaining.isPast) MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.5f)
                             else accentColor.copy(alpha = 0.22f)
                         ),
                     contentAlignment = Alignment.Center
@@ -735,7 +743,7 @@ private fun CountdownCardContent(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(6.dp))
                                 .background(
-                                    if (timeRemaining.isPast) Color(0xFF334155)
+                                    if (timeRemaining.isPast) MaterialTheme.colorScheme.surfaceContainerHighest
                                     else accentColor.copy(alpha = 0.2f)
                                 )
                                 .padding(horizontal = 6.dp, vertical = 2.dp)
@@ -769,7 +777,7 @@ private fun CountdownCardContent(
                     modifier = Modifier
                         .clip(RoundedCornerShape(10.dp))
                         .background(
-                            if (timeRemaining.isPast) Color(0xFF1E293B)
+                            if (timeRemaining.isPast) MaterialTheme.colorScheme.surfaceContainerHigh
                             else accentColor.copy(alpha = 0.22f)
                         )
                         .padding(horizontal = 10.dp, vertical = 6.dp)
@@ -848,7 +856,7 @@ private fun CountdownCardContent(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(10.dp))
-                                .background(Color(0xFF0F172A))
+                                .background(MaterialTheme.colorScheme.surfaceContainerHighest)
                                 .padding(horizontal = 14.dp, vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
@@ -868,7 +876,7 @@ private fun CountdownCardContent(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(10.dp))
-                                .background(Color(0xFF0F172A))
+                                .background(MaterialTheme.colorScheme.surfaceContainerHighest)
                                 .padding(horizontal = 14.dp, vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
@@ -890,7 +898,7 @@ private fun CountdownCardContent(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(10.dp))
-                                .background(Color(0xFF0F172A))
+                                .background(MaterialTheme.colorScheme.surfaceContainerHighest)
                                 .padding(horizontal = 14.dp, vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
@@ -929,7 +937,7 @@ private fun CountdownCardContent(
                         .height(6.dp)
                         .clip(RoundedCornerShape(3.dp)),
                     color = accentColor,
-                    trackColor = Color(0xFF0F172A),
+                    trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                     strokeCap = StrokeCap.Round
                 )
             } else {
@@ -937,7 +945,7 @@ private fun CountdownCardContent(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(8.dp))
-                        .background(Color(0xFF0F172A))
+                        .background(MaterialTheme.colorScheme.surfaceContainerHighest)
                         .padding(horizontal = 12.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
@@ -983,7 +991,7 @@ private fun TimeUnitBox(
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(10.dp))
-            .background(Color(0xFF0F172A))
+            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
             .padding(vertical = 8.dp, horizontal = 4.dp),
         contentAlignment = Alignment.Center
     ) {
@@ -1067,18 +1075,81 @@ private fun EmptyCountdownsState(
             Button(
                 onClick = onClearSearch,
                 shape = RoundedCornerShape(10.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = SurfaceSlate800)
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    contentColor = MaterialTheme.colorScheme.primary
+                )
             ) {
-                Text("Clear Filters", color = CyanPrimary)
+                Text("Clear Filters")
             }
         } else {
             Button(
                 onClick = onAddNew,
                 shape = RoundedCornerShape(10.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = CyanPrimary)
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                )
             ) {
-                Text("Add Your First Countdown", color = DeepSlate950, fontWeight = FontWeight.Bold)
+                Text("Add Your First Countdown", fontWeight = FontWeight.Bold)
             }
         }
+    }
+}
+
+@Preview(name = "Compact Phone (OnePlus Nord 6)", device = "spec:width=411dp,height=914dp", showBackground = true)
+@Composable
+private fun CountdownsScreenCompactPreview() {
+    MyApplicationTheme(darkTheme = true) {
+        Surface(color = DeepSlate950) {
+            CountdownPreviewCardContent()
+        }
+    }
+}
+
+@Preview(name = "Landscape Phone", device = "spec:width=914dp,height=411dp", showBackground = true)
+@Composable
+private fun CountdownsScreenLandscapePreview() {
+    MyApplicationTheme(darkTheme = true) {
+        Surface(color = DeepSlate950) {
+            CountdownPreviewCardContent()
+        }
+    }
+}
+
+@Preview(name = "Tablet", device = Devices.TABLET, showBackground = true)
+@Composable
+private fun CountdownsScreenTabletPreview() {
+    MyApplicationTheme(darkTheme = true) {
+        Surface(color = DeepSlate950) {
+            CountdownPreviewCardContent()
+        }
+    }
+}
+
+@Composable
+private fun CountdownPreviewCardContent() {
+    val sample = Countdown(
+        id = 1L,
+        title = "Summer Road Trip 2026",
+        targetTimeMillis = System.currentTimeMillis() + 86400000L * 14,
+        createdTimeMillis = System.currentTimeMillis() - 86400000L * 2,
+        emoji = "🚗",
+        colorHex = "#00E5D0",
+        notes = "Pack cameras and tents",
+        category = "Trip",
+        cardStyle = "modern",
+        displayUnit = "all"
+    )
+    Box(modifier = Modifier.padding(16.dp)) {
+        CountdownCardContent(
+            countdown = sample,
+            now = System.currentTimeMillis(),
+            isHighlighted = false,
+            onTap = {},
+            onLongPress = {},
+            onDuplicate = {},
+            onSetAsWidget = {}
+        )
     }
 }

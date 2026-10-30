@@ -1,9 +1,11 @@
 package com.example.widget
 
 import android.content.Context
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.datastore.preferences.core.Preferences
@@ -18,6 +20,7 @@ import androidx.glance.appwidget.AppWidgetId
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
+import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.provideContent
 import androidx.glance.appwidget.state.getAppWidgetState
@@ -34,6 +37,7 @@ import androidx.glance.layout.height
 import androidx.glance.layout.padding
 import androidx.glance.layout.size
 import androidx.glance.layout.width
+import androidx.glance.GlanceTheme
 import androidx.glance.state.GlanceStateDefinition
 import androidx.glance.state.PreferencesGlanceStateDefinition
 import androidx.glance.text.FontWeight
@@ -52,6 +56,13 @@ private val COUNTDOWN_ID_KEY = ActionParameters.Key<Long>("EXTRA_COUNTDOWN_ID")
 class SmallCountdownWidget : GlanceAppWidget() {
 
     override val stateDefinition: GlanceStateDefinition<*> = PreferencesGlanceStateDefinition
+    override val sizeMode: SizeMode = SizeMode.Responsive(
+        setOf(
+            DpSize(110.dp, 110.dp),
+            DpSize(160.dp, 160.dp),
+            DpSize(240.dp, 240.dp)
+        )
+    )
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val appWidgetId: Int = when (id) {
@@ -76,12 +87,14 @@ class SmallCountdownWidget : GlanceAppWidget() {
             val countdown by produceState<Countdown?>(initial, stateId, tick) {
                 value = WidgetDataLoader.loadCountdown(context, appWidgetId, stateId)
             }
-            SmallWidgetContent(context = context, countdown = countdown)
+            GlanceTheme {
+                SmallWidgetContent(context = context, countdown = countdown)
+            }
         }
     }
 }
 
-@androidx.compose.runtime.Composable
+@Composable
 private fun SmallWidgetContent(context: Context, countdown: Countdown?) {
     val opensItem = WidgetPreferences.isWidgetTapOpensItemEnabled(context)
     val clickAction = if (countdown != null && opensItem) {
@@ -90,14 +103,11 @@ private fun SmallWidgetContent(context: Context, countdown: Countdown?) {
         actionStartActivity<MainActivity>()
     }
 
-    val backgroundColor = Color(0xFF0F172A)
-    val cardBackground = Color(0xFF1E293B)
-
     if (countdown == null) {
         Box(
             modifier = GlanceModifier
                 .fillMaxSize()
-                .background(ColorProvider(backgroundColor))
+                .background(GlanceTheme.colors.surface)
                 .cornerRadius(18.dp)
                 .padding(14.dp)
                 .clickable(clickAction),
@@ -109,13 +119,13 @@ private fun SmallWidgetContent(context: Context, countdown: Countdown?) {
             ) {
                 Text(
                     text = "⏳",
-                    style = TextStyle(fontSize = 32.sp)
+                    style = TextStyle(fontSize = 30.sp)
                 )
                 Spacer(modifier = GlanceModifier.height(6.dp))
                 Text(
                     text = "No countdowns",
                     style = TextStyle(
-                        color = ColorProvider(Color(0xFFE2E8F0)),
+                        color = GlanceTheme.colors.onSurface,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -123,7 +133,7 @@ private fun SmallWidgetContent(context: Context, countdown: Countdown?) {
                 Text(
                     text = "Tap to add one",
                     style = TextStyle(
-                        color = ColorProvider(Color(0xFF94A3B8)),
+                        color = GlanceTheme.colors.onSurfaceVariant,
                         fontSize = 11.sp
                     )
                 )
@@ -141,13 +151,13 @@ private fun SmallWidgetContent(context: Context, countdown: Countdown?) {
     val accentColor = try {
         Color(android.graphics.Color.parseColor(countdown.colorHex))
     } catch (e: Exception) {
-        Color(0xFF38BDF8)
+        Color(0xFF00E5D0)
     }
 
     Box(
         modifier = GlanceModifier
             .fillMaxSize()
-            .background(ColorProvider(backgroundColor))
+            .background(GlanceTheme.colors.surface)
             .cornerRadius(18.dp)
             .clickable(clickAction)
     ) {
@@ -165,7 +175,7 @@ private fun SmallWidgetContent(context: Context, countdown: Countdown?) {
                 Box(
                     modifier = GlanceModifier
                         .size(28.dp)
-                        .background(ColorProvider(accentColor.copy(alpha = 0.25f)))
+                        .background(ColorProvider(accentColor.copy(alpha = 0.22f)))
                         .cornerRadius(14.dp),
                     contentAlignment = Alignment.Center
                 ) {
@@ -179,7 +189,7 @@ private fun SmallWidgetContent(context: Context, countdown: Countdown?) {
                     text = countdown.title,
                     maxLines = 1,
                     style = TextStyle(
-                        color = ColorProvider(Color(0xFFF1F5F9)),
+                        color = GlanceTheme.colors.onSurface,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -188,12 +198,12 @@ private fun SmallWidgetContent(context: Context, countdown: Countdown?) {
 
             Spacer(modifier = GlanceModifier.height(8.dp))
 
-            // Main Display: Big Days Number
+            // Main Display: Big Days Number with theme surfaceVariant background
             Box(
                 modifier = GlanceModifier
                     .fillMaxWidth()
                     .defaultWeight()
-                    .background(ColorProvider(cardBackground))
+                    .background(GlanceTheme.colors.surfaceVariant)
                     .cornerRadius(12.dp)
                     .padding(vertical = 4.dp, horizontal = 6.dp),
                 contentAlignment = Alignment.Center
@@ -205,7 +215,7 @@ private fun SmallWidgetContent(context: Context, countdown: Countdown?) {
                     Text(
                         text = timeRemaining.daysOnlyText,
                         style = TextStyle(
-                            color = ColorProvider(if (timeRemaining.isPast) Color(0xFF94A3B8) else accentColor),
+                            color = if (timeRemaining.isPast) GlanceTheme.colors.onSurfaceVariant else ColorProvider(accentColor),
                             fontSize = 32.sp,
                             fontWeight = FontWeight.Bold,
                             textAlign = TextAlign.Center
@@ -218,7 +228,7 @@ private fun SmallWidgetContent(context: Context, countdown: Countdown?) {
                             if (timeRemaining.totalDays == 1L) "DAY LEFT" else "DAYS LEFT"
                         },
                         style = TextStyle(
-                            color = ColorProvider(if (timeRemaining.isPast) Color(0xFF64748B) else Color(0xFFCBD5E1)),
+                            color = GlanceTheme.colors.onSurfaceVariant,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Medium,
                             textAlign = TextAlign.Center
@@ -241,7 +251,7 @@ private fun SmallWidgetContent(context: Context, countdown: Countdown?) {
                         timeRemaining.subtitleText
                     },
                     style = TextStyle(
-                        color = ColorProvider(Color(0xFF94A3B8)),
+                        color = GlanceTheme.colors.onSurfaceVariant,
                         fontSize = 10.sp,
                         textAlign = TextAlign.Center
                     )

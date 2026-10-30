@@ -1,9 +1,11 @@
 package com.example.widget
 
 import android.content.Context
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.datastore.preferences.core.Preferences
@@ -15,6 +17,7 @@ import androidx.glance.action.actionStartActivity
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
+import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.provideContent
 import androidx.glance.background
@@ -30,6 +33,7 @@ import androidx.glance.layout.height
 import androidx.glance.layout.padding
 import androidx.glance.layout.size
 import androidx.glance.layout.width
+import androidx.glance.GlanceTheme
 import androidx.glance.state.GlanceStateDefinition
 import androidx.glance.state.PreferencesGlanceStateDefinition
 import androidx.glance.text.FontWeight
@@ -46,6 +50,13 @@ private val COUNTDOWN_ID_KEY = ActionParameters.Key<Long>("EXTRA_COUNTDOWN_ID")
 class MediumCountdownWidget : GlanceAppWidget() {
 
     override val stateDefinition: GlanceStateDefinition<*> = PreferencesGlanceStateDefinition
+    override val sizeMode: SizeMode = SizeMode.Responsive(
+        setOf(
+            DpSize(220.dp, 100.dp),
+            DpSize(300.dp, 120.dp),
+            DpSize(400.dp, 160.dp)
+        )
+    )
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val initial = WidgetDataLoader.loadUpcoming(context, 3)
@@ -56,19 +67,19 @@ class MediumCountdownWidget : GlanceAppWidget() {
             val items by produceState<List<Countdown>>(initial, tick) {
                 value = WidgetDataLoader.loadUpcoming(context, 3)
             }
-            MediumWidgetContent(context = context, items = items)
+            GlanceTheme {
+                MediumWidgetContent(context = context, items = items)
+            }
         }
     }
 }
 
-@androidx.compose.runtime.Composable
+@Composable
 private fun MediumWidgetContent(context: Context, items: List<Countdown>) {
-    val backgroundColor = Color(0xFF0F172A)
-
     Box(
         modifier = GlanceModifier
             .fillMaxSize()
-            .background(ColorProvider(backgroundColor))
+            .background(GlanceTheme.colors.surface)
             .cornerRadius(18.dp)
             .padding(12.dp)
             .clickable(actionStartActivity<MainActivity>())
@@ -87,7 +98,7 @@ private fun MediumWidgetContent(context: Context, items: List<Countdown>) {
                 Text(
                     text = "UPCOMING COUNTDOWNS",
                     style = TextStyle(
-                        color = ColorProvider(Color(0xFF38BDF8)),
+                        color = GlanceTheme.colors.primary,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -106,7 +117,7 @@ private fun MediumWidgetContent(context: Context, items: List<Countdown>) {
                     Text(
                         text = "No active countdowns. Tap to add one!",
                         style = TextStyle(
-                            color = ColorProvider(Color(0xFF94A3B8)),
+                            color = GlanceTheme.colors.onSurfaceVariant,
                             fontSize = 12.sp,
                             textAlign = TextAlign.Center
                         )
@@ -124,7 +135,7 @@ private fun MediumWidgetContent(context: Context, items: List<Countdown>) {
     }
 }
 
-@androidx.compose.runtime.Composable
+@Composable
 private fun MediumCountdownRow(context: Context, countdown: Countdown) {
     val opensItem = WidgetPreferences.isWidgetTapOpensItemEnabled(context)
     val rowClickAction = if (opensItem) {
@@ -143,15 +154,13 @@ private fun MediumCountdownRow(context: Context, countdown: Countdown) {
     val accentColor = try {
         Color(android.graphics.Color.parseColor(countdown.colorHex))
     } catch (e: Exception) {
-        Color(0xFF38BDF8)
+        Color(0xFF00E5D0)
     }
-
-    val cardColor = Color(0xFF1E293B)
 
     Box(
         modifier = GlanceModifier
             .fillMaxWidth()
-            .background(ColorProvider(cardColor))
+            .background(GlanceTheme.colors.surfaceVariant)
             .cornerRadius(10.dp)
             .padding(horizontal = 8.dp, vertical = 6.dp)
             .clickable(rowClickAction)
@@ -182,7 +191,7 @@ private fun MediumCountdownRow(context: Context, countdown: Countdown) {
                     text = countdown.title,
                     maxLines = 1,
                     style = TextStyle(
-                        color = ColorProvider(Color(0xFFF8FAFC)),
+                        color = GlanceTheme.colors.onSurface,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -190,7 +199,7 @@ private fun MediumCountdownRow(context: Context, countdown: Countdown) {
                 Text(
                     text = TimeFormatUtils.formatDateShort(countdown.targetTimeMillis),
                     style = TextStyle(
-                        color = ColorProvider(Color(0xFF94A3B8)),
+                        color = GlanceTheme.colors.onSurfaceVariant,
                         fontSize = 10.sp
                     )
                 )
@@ -201,7 +210,7 @@ private fun MediumCountdownRow(context: Context, countdown: Countdown) {
             // Remaining Badge
             Box(
                 modifier = GlanceModifier
-                    .background(ColorProvider(if (timeRemaining.isPast) Color(0xFF334155) else accentColor.copy(alpha = 0.25f)))
+                    .background(if (timeRemaining.isPast) GlanceTheme.colors.surface else ColorProvider(accentColor.copy(alpha = 0.25f)))
                     .cornerRadius(6.dp)
                     .padding(horizontal = 6.dp, vertical = 3.dp),
                 contentAlignment = Alignment.Center
@@ -215,7 +224,7 @@ private fun MediumCountdownRow(context: Context, countdown: Countdown) {
                         "${timeRemaining.hours}h ${timeRemaining.minutes}m"
                     },
                     style = TextStyle(
-                        color = ColorProvider(if (timeRemaining.isPast) Color(0xFF94A3B8) else accentColor),
+                        color = if (timeRemaining.isPast) GlanceTheme.colors.onSurfaceVariant else ColorProvider(accentColor),
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold
                     )

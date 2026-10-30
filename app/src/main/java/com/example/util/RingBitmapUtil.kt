@@ -14,25 +14,13 @@ object RingBitmapUtil {
      */
     fun createProgressRingBitmap(
         progress: Float, // 0.0f to 1.0f
-        colorHex: String,
+        ringColor: Int,
+        trackColor: Int,
         sizePx: Int = 220,
         strokeWidthPx: Float = 20f
     ): Bitmap {
         val bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
-
-        val mainColor = try {
-            Color.parseColor(colorHex)
-        } catch (e: Exception) {
-            Color.parseColor("#38BDF8")
-        }
-
-        val trackColor = Color.argb(
-            45,
-            Color.red(mainColor),
-            Color.green(mainColor),
-            Color.blue(mainColor)
-        )
 
         val padding = strokeWidthPx / 2f + 4f
         val oval = RectF(padding, padding, sizePx - padding, sizePx - padding)
@@ -51,10 +39,41 @@ object RingBitmapUtil {
             style = Paint.Style.STROKE
             strokeWidth = strokeWidthPx
             strokeCap = Paint.Cap.ROUND
-            color = mainColor
+            color = ringColor
         }
         canvas.drawArc(oval, -90f, sweepAngle, false, progressPaint)
 
         return bitmap
+    }
+
+    /**
+     * Overload accepting hex string with automatic track color computation.
+     */
+    fun createProgressRingBitmap(
+        progress: Float,
+        colorHex: String,
+        sizePx: Int = 220,
+        strokeWidthPx: Float = 20f
+    ): Bitmap {
+        val mainColor = try {
+            Color.parseColor(colorHex)
+        } catch (e: Exception) {
+            Color.parseColor("#38BDF8")
+        }
+
+        val trackColor = Color.argb(
+            45,
+            Color.red(mainColor),
+            Color.green(mainColor),
+            Color.blue(mainColor)
+        )
+
+        return createProgressRingBitmap(
+            progress = progress,
+            ringColor = mainColor,
+            trackColor = trackColor,
+            sizePx = sizePx,
+            strokeWidthPx = strokeWidthPx
+        )
     }
 }

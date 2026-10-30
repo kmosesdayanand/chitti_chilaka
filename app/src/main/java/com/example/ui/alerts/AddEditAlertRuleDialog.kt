@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -154,7 +155,9 @@ fun AddEditAlertRuleDialog(
             color = DeepSlate900
         ) {
             Column(
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier
+                    .fillMaxSize()
+                    .imePadding()
             ) {
                 // Fixed Header
                 Column(
@@ -671,8 +674,8 @@ fun AddEditAlertRuleDialog(
                         .fillMaxWidth()
                         .testTag("btn_dialog_test_sound"),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isTestingSound) CyanPrimary else SurfaceSlate800,
-                        contentColor = if (isTestingSound) DeepSlate900 else CyanPrimary
+                        containerColor = if (isTestingSound) MaterialTheme.colorScheme.primary else SurfaceSlate800,
+                        contentColor = if (isTestingSound) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary
                     ),
                     shape = RoundedCornerShape(12.dp)
                 ) {
@@ -709,7 +712,7 @@ fun AddEditAlertRuleDialog(
                         },
                         modifier = Modifier.testTag("btn_cancel_alert_rule")
                     ) {
-                        Text("Cancel", color = TextSecondary)
+                        Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
 
                     Spacer(modifier = Modifier.width(10.dp))
@@ -729,11 +732,14 @@ fun AddEditAlertRuleDialog(
                             )
                         },
                         modifier = Modifier.testTag("btn_save_alert_rule"),
-                        colors = ButtonDefaults.buttonColors(containerColor = CyanPrimary)
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
+                        )
                     ) {
                         Text(
                             text = if (rule == null) "Create Alert" else "Save Changes",
-                            color = DeepSlate900,
+                            color = MaterialTheme.colorScheme.onPrimary,
                             fontWeight = FontWeight.Bold
                         )
                     }

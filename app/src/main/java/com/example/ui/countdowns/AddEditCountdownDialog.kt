@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -141,6 +142,7 @@ fun AddEditCountdownDialog(
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(max = 520.dp)
+                    .imePadding()
                     .verticalScroll(scrollState)
             ) {
                 // Event Title
@@ -646,8 +648,8 @@ fun AddEditCountdownDialog(
                 modifier = Modifier.testTag("dialog_save_button"),
                 shape = RoundedCornerShape(10.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = CyanPrimary,
-                    contentColor = Color(0xFF0F172A)
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
                 )
             ) {
                 Text(if (isEditing) "Save Customizations" else "Create Countdown", fontWeight = FontWeight.Bold)
@@ -658,7 +660,7 @@ fun AddEditCountdownDialog(
                 onClick = onDismiss,
                 modifier = Modifier.testTag("dialog_cancel_button")
             ) {
-                Text("Cancel", color = TextSecondary)
+                Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     )
