@@ -110,7 +110,7 @@ fun AlertsPlaceholderScreen() {
                     text = "• Smart phone sound & volume automation profiles\n• Battery critical alert monitoring\n• Important event ringtones and custom vibrations",
                     style = MaterialTheme.typography.bodyMedium.copy(
                         color = TextSecondary,
-                        lineHeight = 22.sp
+                        lineHeight = 20.sp
                     )
                 )
             }

@@ -50,12 +50,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import com.example.service.BatteryAlertService
+import com.example.service.VipRingManager
 import com.example.ui.alerts.AlertsScreen
 import com.example.ui.alerts.AlertsViewModel
+import com.example.ui.contacts.ContactsScreen
+import com.example.ui.contacts.ContactsViewModel
+import com.example.ui.contacts.VipSetupScreen
 import com.example.ui.countdowns.CountdownsScreen
 import com.example.ui.countdowns.CountdownsViewModel
 import com.example.ui.navigation.Screen
-import com.example.ui.placeholders.ContactsPlaceholderScreen
 import com.example.ui.placeholders.SettingsPlaceholderScreen
 import com.example.ui.splash.SentrySplashScreen
 import com.example.ui.theme.CyanPrimary
@@ -74,6 +77,7 @@ class MainActivity : ComponentActivity() {
 
     private val countdownsViewModel: CountdownsViewModel by viewModels()
     private val alertsViewModel: AlertsViewModel by viewModels()
+    private val contactsViewModel: ContactsViewModel by viewModels()
     private var pendingCountdownId = mutableStateOf<Long?>(null)
 
     @OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
@@ -87,6 +91,7 @@ class MainActivity : ComponentActivity() {
         try {
             CountdownWorker.schedulePeriodicUpdates(applicationContext)
             BatteryAlertService.syncWithDatabase(applicationContext)
+            VipRingManager.restoreIfLeftActive(applicationContext)
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -152,79 +157,95 @@ class MainActivity : ComponentActivity() {
                         onSplashFinished = { showSplash = false }
                     )
                 } else {
-                    // If user is on a placeholder screen, pressing back returns to Countdowns
-                    if (currentScreen != Screen.Countdowns) {
+                    var showVipSetupScreen by remember { mutableStateOf(false) }
+
+                    if (showVipSetupScreen) {
                         BackHandler {
-                            currentScreen = Screen.Countdowns
+                            showVipSetupScreen = false
                         }
-                    }
-
-                    if (isCompact) {
-                        // Compact width (Phones in portrait, e.g. OnePlus Nord 6 in portrait): Bottom NavigationBar
-                        Scaffold(
-                            modifier = Modifier.fillMaxSize(),
-                            containerColor = DeepSlate950,
-                            contentWindowInsets = WindowInsets.safeDrawing,
-                            bottomBar = {
-                                SentryBottomNav(
-                                    currentScreen = currentScreen,
-                                    onTabSelected = { selected ->
-                                        currentScreen = selected
-                                    }
-                                )
-                            }
-                        ) { innerPadding ->
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(innerPadding)
-                            ) {
-                                MainScreenRouter(
-                                    currentScreen = currentScreen,
-                                    countdownsViewModel = countdownsViewModel,
-                                    alertsViewModel = alertsViewModel,
-                                    onThemeModeChanged = { newMode -> themeMode = newMode },
-                                    onDynamicColorChanged = { newDynamic -> dynamicColor = newDynamic }
-                                )
-                            }
-                        }
+                        VipSetupScreen(
+                            viewModel = contactsViewModel,
+                            onNavigateBack = { showVipSetupScreen = false }
+                        )
                     } else {
-                        // Medium / Expanded width (Landscape phones, foldables, tablets): Side NavigationRail
-                        Scaffold(
-                            modifier = Modifier.fillMaxSize(),
-                            containerColor = DeepSlate950,
-                            contentWindowInsets = WindowInsets.safeDrawing
-                        ) { innerPadding ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(innerPadding)
-                            ) {
-                                SentryNavigationRail(
-                                    currentScreen = currentScreen,
-                                    onTabSelected = { selected ->
-                                        currentScreen = selected
-                                    }
-                                )
+                        // If user is on a secondary screen, pressing back returns to Countdowns
+                        if (currentScreen != Screen.Countdowns) {
+                            BackHandler {
+                                currentScreen = Screen.Countdowns
+                            }
+                        }
 
+                        if (isCompact) {
+                            // Compact width (Phones in portrait, e.g. OnePlus Nord 6 in portrait): Bottom NavigationBar
+                            Scaffold(
+                                modifier = Modifier.fillMaxSize(),
+                                containerColor = DeepSlate950,
+                                contentWindowInsets = WindowInsets.safeDrawing,
+                                bottomBar = {
+                                    SentryBottomNav(
+                                        currentScreen = currentScreen,
+                                        onTabSelected = { selected ->
+                                            currentScreen = selected
+                                        }
+                                    )
+                                }
+                            ) { innerPadding ->
                                 Box(
                                     modifier = Modifier
                                         .fillMaxSize()
-                                        .navigationBarsPadding(),
-                                    contentAlignment = if (isExpanded) Alignment.TopCenter else Alignment.TopStart
+                                        .padding(innerPadding)
                                 ) {
+                                    MainScreenRouter(
+                                        currentScreen = currentScreen,
+                                        countdownsViewModel = countdownsViewModel,
+                                        alertsViewModel = alertsViewModel,
+                                        contactsViewModel = contactsViewModel,
+                                        onNavigateToSetup = { showVipSetupScreen = true },
+                                        onThemeModeChanged = { newMode -> themeMode = newMode },
+                                        onDynamicColorChanged = { newDynamic -> dynamicColor = newDynamic }
+                                    )
+                                }
+                            }
+                        } else {
+                            // Medium / Expanded width (Landscape phones, foldables, tablets): Side NavigationRail
+                            Scaffold(
+                                modifier = Modifier.fillMaxSize(),
+                                containerColor = DeepSlate950,
+                                contentWindowInsets = WindowInsets.safeDrawing
+                            ) { innerPadding ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(innerPadding)
+                                ) {
+                                    SentryNavigationRail(
+                                        currentScreen = currentScreen,
+                                        onTabSelected = { selected ->
+                                            currentScreen = selected
+                                        }
+                                    )
+
                                     Box(
                                         modifier = Modifier
                                             .fillMaxSize()
-                                            .then(if (isExpanded) Modifier.widthIn(max = 840.dp) else Modifier)
+                                            .navigationBarsPadding(),
+                                        contentAlignment = if (isExpanded) Alignment.TopCenter else Alignment.TopStart
                                     ) {
-                                        MainScreenRouter(
-                                            currentScreen = currentScreen,
-                                            countdownsViewModel = countdownsViewModel,
-                                            alertsViewModel = alertsViewModel,
-                                            onThemeModeChanged = { newMode -> themeMode = newMode },
-                                            onDynamicColorChanged = { newDynamic -> dynamicColor = newDynamic }
-                                        )
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .then(if (isExpanded) Modifier.widthIn(max = 840.dp) else Modifier)
+                                        ) {
+                                            MainScreenRouter(
+                                                currentScreen = currentScreen,
+                                                countdownsViewModel = countdownsViewModel,
+                                                alertsViewModel = alertsViewModel,
+                                                contactsViewModel = contactsViewModel,
+                                                onNavigateToSetup = { showVipSetupScreen = true },
+                                                onThemeModeChanged = { newMode -> themeMode = newMode },
+                                                onDynamicColorChanged = { newDynamic -> dynamicColor = newDynamic }
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -259,6 +280,8 @@ private fun MainScreenRouter(
     currentScreen: Screen,
     countdownsViewModel: CountdownsViewModel,
     alertsViewModel: AlertsViewModel,
+    contactsViewModel: ContactsViewModel,
+    onNavigateToSetup: () -> Unit,
     onThemeModeChanged: (String) -> Unit,
     onDynamicColorChanged: (Boolean) -> Unit
 ) {
@@ -276,12 +299,17 @@ private fun MainScreenRouter(
             )
         }
         Screen.Contacts -> {
-            ContactsPlaceholderScreen()
+            ContactsScreen(
+                viewModel = contactsViewModel,
+                onNavigateToSetup = onNavigateToSetup,
+                modifier = Modifier.fillMaxSize()
+            )
         }
         Screen.Settings -> {
             SettingsPlaceholderScreen(
                 onThemeModeChanged = onThemeModeChanged,
-                onDynamicColorChanged = onDynamicColorChanged
+                onDynamicColorChanged = onDynamicColorChanged,
+                onNavigateToVipSetup = onNavigateToSetup
             )
         }
     }
@@ -315,7 +343,7 @@ fun SentryBottomNav(
                         text = screen.title,
                         style = MaterialTheme.typography.labelSmall.copy(
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                            fontSize = 11.sp,
+                            fontSize = 10.sp,
                             color = if (isSelected) CyanPrimary else TextMuted
                         )
                     )

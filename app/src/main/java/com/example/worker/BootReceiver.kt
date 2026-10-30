@@ -20,6 +20,9 @@ class BootReceiver : BroadcastReceiver() {
             // Start BatteryAlertService if any rules are active
             BatteryAlertService.syncWithDatabase(context)
 
+            // Restore any leftover VIP ring state if interrupted by reboot or update
+            com.example.service.VipRingManager.restoreIfLeftActive(context)
+
             // Immediately refresh widgets with freshly computed time left
             val pendingResult = goAsync()
             CoroutineScope(Dispatchers.IO).launch {

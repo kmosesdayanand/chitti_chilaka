@@ -209,7 +209,7 @@ fun AddEditAlertRuleDialog(
                                 soundType = AlertRule.SOUND_VOICE_CHARGED
                             }
                         },
-                        label = { Text("⚡ When charging up to", fontSize = 12.sp) },
+                        label = { Text("⚡ When charging up to", fontSize = 11.sp) },
                         modifier = Modifier
                             .weight(1f)
                             .testTag("chip_direction_charging_up"),
@@ -228,7 +228,7 @@ fun AddEditAlertRuleDialog(
                                 soundType = AlertRule.SOUND_VOICE_ALERT
                             }
                         },
-                        label = { Text("🔋 When draining down to", fontSize = 12.sp) },
+                        label = { Text("🔋 When draining down to", fontSize = 11.sp) },
                         modifier = Modifier
                             .weight(1f)
                             .testTag("chip_direction_draining_down"),
@@ -324,7 +324,7 @@ fun AddEditAlertRuleDialog(
                         FilterChip(
                             selected = soundType == AlertRule.SOUND_VOICE_CHARGED,
                             onClick = { soundType = AlertRule.SOUND_VOICE_CHARGED },
-                            label = { Text("⚡ Full Power Voice", fontSize = 11.sp) },
+                            label = { Text("⚡ Full Power Voice", fontSize = 10.sp) },
                             modifier = Modifier
                                 .weight(1f)
                                 .testTag("chip_sound_VOICE_CHARGED"),
@@ -338,7 +338,7 @@ fun AddEditAlertRuleDialog(
                         FilterChip(
                             selected = soundType == AlertRule.SOUND_VOICE_ALERT,
                             onClick = { soundType = AlertRule.SOUND_VOICE_ALERT },
-                            label = { Text("🎙️ Low Power Voice", fontSize = 11.sp) },
+                            label = { Text("🎙️ Low Power Voice", fontSize = 10.sp) },
                             modifier = Modifier
                                 .weight(1f)
                                 .testTag("chip_sound_VOICE_ALERT"),
@@ -358,7 +358,7 @@ fun AddEditAlertRuleDialog(
                         FilterChip(
                             selected = soundType == AlertRule.SOUND_ALARM,
                             onClick = { soundType = AlertRule.SOUND_ALARM },
-                            label = { Text("⏰ Alarm", fontSize = 11.sp) },
+                            label = { Text("⏰ Alarm", fontSize = 10.sp) },
                             modifier = Modifier
                                 .weight(1f)
                                 .testTag("chip_sound_ALARM"),
@@ -372,7 +372,7 @@ fun AddEditAlertRuleDialog(
                         FilterChip(
                             selected = soundType == AlertRule.SOUND_NOTIFICATION,
                             onClick = { soundType = AlertRule.SOUND_NOTIFICATION },
-                            label = { Text("🔔 Notification", fontSize = 11.sp) },
+                            label = { Text("🔔 Notification", fontSize = 10.sp) },
                             modifier = Modifier
                                 .weight(1f)
                                 .testTag("chip_sound_NOTIFICATION"),
@@ -394,7 +394,7 @@ fun AddEditAlertRuleDialog(
                                     audioPickerLauncher.launch(arrayOf("audio/*"))
                                 }
                             },
-                            label = { Text("📁 Custom File...", fontSize = 11.sp) },
+                            label = { Text("📁 Custom File...", fontSize = 10.sp) },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .testTag("chip_sound_CUSTOM"),
@@ -447,7 +447,7 @@ fun AddEditAlertRuleDialog(
                                 onClick = { audioPickerLauncher.launch(arrayOf("audio/*")) },
                                 modifier = Modifier.testTag("btn_browse_audio")
                             ) {
-                                Text("Browse", fontSize = 12.sp)
+                                Text("Browse", fontSize = 11.sp)
                             }
                         }
                     }
@@ -549,7 +549,7 @@ fun AddEditAlertRuleDialog(
                                 modifier = Modifier.size(14.dp)
                             )
                             Spacer(modifier = Modifier.width(2.dp))
-                            Text("Full Audio", fontSize = 11.sp, color = CyanPrimary)
+                            Text("Full Audio", fontSize = 10.sp, color = CyanPrimary)
                         }
                     }
                 }
@@ -688,7 +688,7 @@ fun AddEditAlertRuleDialog(
                     Text(
                         text = if (isTestingSound) "Playing chosen part once... Tap to stop" else "Test Chosen Audio Part (Plays Once)",
                         fontWeight = FontWeight.SemiBold,
-                        fontSize = 13.sp
+                        fontSize = 12.sp
                     )
                 }
 

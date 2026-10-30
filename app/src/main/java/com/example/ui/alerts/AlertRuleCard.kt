@@ -228,7 +228,7 @@ fun AlertRuleCard(
                         text = if (isChargingUp) "Alerts when charger reaches ${rule.level}%" else "Alerts when battery drops to ${rule.level}%",
                         style = MaterialTheme.typography.bodySmall.copy(
                             color = if (rule.enabled) TextSecondary else TextMuted,
-                            fontSize = 11.sp
+                            fontSize = 10.sp
                         )
                     )
                 }
@@ -286,7 +286,7 @@ fun AlertRuleCard(
                                 text = rule.soundLabel,
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     color = TextPrimary,
-                                    fontSize = 11.sp
+                                    fontSize = 10.sp
                                 ),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
@@ -313,7 +313,7 @@ fun AlertRuleCard(
                                 text = "${(rule.volume * 100).toInt()}%",
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     color = TextSecondary,
-                                    fontSize = 11.sp
+                                    fontSize = 10.sp
                                 ),
                                 maxLines = 1
                             )
@@ -364,7 +364,7 @@ fun AlertRuleCard(
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
                         text = if (isPlaying) "Stop" else "Test Sound",
-                        fontSize = 11.sp,
+                        fontSize = 10.sp,
                         fontWeight = FontWeight.Medium,
                         maxLines = 1,
                         softWrap = false

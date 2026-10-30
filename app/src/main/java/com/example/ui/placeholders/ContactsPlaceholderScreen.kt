@@ -107,7 +107,7 @@ fun ContactsPlaceholderScreen() {
                     text = "• VIP & emergency one-tap speed dial\n• Contact duplicate detection and grouping\n• Quick message shortcuts & birthday reminders",
                     style = MaterialTheme.typography.bodyMedium.copy(
                         color = TextSecondary,
-                        lineHeight = 22.sp
+                        lineHeight = 20.sp
                     )
                 )
             }

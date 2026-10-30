@@ -161,7 +161,7 @@ fun CountdownsScreen(
                     Text(
                         text = "New Countdown",
                         fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp
+                        fontSize = 13.sp
                     )
                 }
             }
@@ -374,7 +374,7 @@ private fun SearchAndSortBar(
         OutlinedTextField(
             value = searchQuery,
             onValueChange = onSearchChange,
-            placeholder = { Text("Search title, category, notes...", color = TextMuted, fontSize = 13.sp) },
+            placeholder = { Text("Search title, category, notes...", color = TextMuted, fontSize = 12.sp) },
             leadingIcon = {
                 Icon(
                     imageVector = Icons.Default.Search,
@@ -487,7 +487,7 @@ private fun CategoryFilterPillsRow(
             ) {
                 Text(
                     text = cat,
-                    fontSize = 11.sp,
+                    fontSize = 10.sp,
                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                     color = if (isSelected) DeepSlate950 else TextSecondary
                 )
@@ -513,7 +513,7 @@ private fun FilterChipsRow(
         FilterChip(
             selected = activeFilter == CountdownFilter.ALL,
             onClick = { onFilterSelect(CountdownFilter.ALL) },
-            label = { Text("All ($allCount)", fontSize = 12.sp) },
+            label = { Text("All ($allCount)", fontSize = 11.sp) },
             colors = FilterChipDefaults.filterChipColors(
                 selectedContainerColor = CyanPrimary.copy(alpha = 0.2f),
                 selectedLabelColor = CyanPrimary,
@@ -531,7 +531,7 @@ private fun FilterChipsRow(
         FilterChip(
             selected = activeFilter == CountdownFilter.UPCOMING,
             onClick = { onFilterSelect(CountdownFilter.UPCOMING) },
-            label = { Text("Upcoming ($upcomingCount)", fontSize = 12.sp) },
+            label = { Text("Upcoming ($upcomingCount)", fontSize = 11.sp) },
             colors = FilterChipDefaults.filterChipColors(
                 selectedContainerColor = CyanPrimary.copy(alpha = 0.2f),
                 selectedLabelColor = CyanPrimary,
@@ -549,7 +549,7 @@ private fun FilterChipsRow(
         FilterChip(
             selected = activeFilter == CountdownFilter.PAST,
             onClick = { onFilterSelect(CountdownFilter.PAST) },
-            label = { Text("Past ($pastCount)", fontSize = 12.sp) },
+            label = { Text("Past ($pastCount)", fontSize = 11.sp) },
             colors = FilterChipDefaults.filterChipColors(
                 selectedContainerColor = CyanPrimary.copy(alpha = 0.2f),
                 selectedLabelColor = CyanPrimary,
@@ -615,7 +615,7 @@ private fun CountdownSwipeableCard(
                         text = "Delete",
                         fontWeight = FontWeight.Bold,
                         color = Color.White,
-                        fontSize = 15.sp
+                        fontSize = 14.sp
                     )
                 }
             }
@@ -720,7 +720,7 @@ private fun CountdownCardContent(
                 ) {
                     Text(
                         text = countdown.emoji,
-                        fontSize = 24.sp
+                        fontSize = 22.sp
                     )
                 }
 
@@ -751,7 +751,7 @@ private fun CountdownCardContent(
                             Text(
                                 text = countdown.category,
                                 style = MaterialTheme.typography.labelSmall.copy(
-                                    fontSize = 9.sp,
+                                    fontSize = 10.sp,
                                     color = if (timeRemaining.isPast) TextMuted else accentColor,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -971,7 +971,7 @@ private fun CountdownCardContent(
                     text = countdown.notes,
                     style = MaterialTheme.typography.bodySmall.copy(
                         color = if (timeRemaining.isPast) TextMuted else TextSecondary,
-                        lineHeight = 16.sp
+                        lineHeight = 14.5.sp
                     ),
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
@@ -1006,7 +1006,7 @@ private fun TimeUnitBox(
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelSmall.copy(
-                    fontSize = 9.sp,
+                    fontSize = 10.sp,
                     color = TextMuted,
                     fontWeight = FontWeight.Medium
                 )
@@ -1064,7 +1064,7 @@ private fun EmptyCountdownsState(
             style = MaterialTheme.typography.bodySmall.copy(
                 color = TextSecondary,
                 textAlign = TextAlign.Center,
-                lineHeight = 20.sp
+                lineHeight = 18.5.sp
             ),
             modifier = Modifier.padding(horizontal = 16.dp)
         )

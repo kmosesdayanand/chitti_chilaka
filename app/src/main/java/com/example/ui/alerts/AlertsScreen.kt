@@ -368,7 +368,7 @@ private fun BatteryHeaderSection(
                         style = MaterialTheme.typography.headlineLarge.copy(
                             color = TextPrimary,
                             fontWeight = FontWeight.ExtraBold,
-                            fontSize = 36.sp
+                            fontSize = 33.sp
                         )
                     )
                     Spacer(modifier = Modifier.width(8.dp))
@@ -449,7 +449,7 @@ private fun EmptyAlertsState() {
             text = "Audio alerts notify you when battery charging reaches target thresholds or battery drops.",
             style = MaterialTheme.typography.bodyMedium.copy(
                 color = TextSecondary,
-                lineHeight = 20.sp
+                lineHeight = 18.5.sp
             ),
             textAlign = TextAlign.Center
         )

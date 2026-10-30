@@ -213,7 +213,7 @@ fun AddEditCountdownDialog(
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = TimeFormatUtils.formatDateShort(targetMillis),
-                            fontSize = 12.sp,
+                            fontSize = 11.sp,
                             maxLines = 1
                         )
                     }
@@ -248,7 +248,7 @@ fun AddEditCountdownDialog(
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = TimeFormatUtils.formatTimeOnly(targetMillis),
-                            fontSize = 12.sp,
+                            fontSize = 11.sp,
                             maxLines = 1
                         )
                     }
@@ -277,7 +277,7 @@ fun AddEditCountdownDialog(
                         FilterChip(
                             selected = isSelected,
                             onClick = { selectedCategory = cat },
-                            label = { Text(cat, fontSize = 12.sp) },
+                            label = { Text(cat, fontSize = 11.sp) },
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = CyanPrimary.copy(alpha = 0.25f),
                                 selectedLabelColor = CyanPrimary,
@@ -327,7 +327,7 @@ fun AddEditCountdownDialog(
                         ) {
                             Text(
                                 text = styleLabel,
-                                fontSize = 11.sp,
+                                fontSize = 10.sp,
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                 color = if (isSelected) CyanPrimary else TextSecondary,
                                 maxLines = 1
@@ -359,7 +359,7 @@ fun AddEditCountdownDialog(
                         FilterChip(
                             selected = isSelected,
                             onClick = { selectedDisplayUnit = unitKey },
-                            label = { Text(unitLabel, fontSize = 12.sp) },
+                            label = { Text(unitLabel, fontSize = 11.sp) },
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = CyanPrimary.copy(alpha = 0.25f),
                                 selectedLabelColor = CyanPrimary,
@@ -461,7 +461,7 @@ fun AddEditCountdownDialog(
                                 .testTag("emoji_option_$emoji"),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(text = emoji, fontSize = 20.sp)
+                            Text(text = emoji, fontSize = 18.5.sp)
                         }
                     }
                 }
@@ -568,7 +568,7 @@ fun AddEditCountdownDialog(
                                 .background(previewColor.copy(alpha = 0.25f)),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(text = selectedEmoji, fontSize = 20.sp)
+                            Text(text = selectedEmoji, fontSize = 18.5.sp)
                         }
 
                         Spacer(modifier = Modifier.width(12.dp))
@@ -593,7 +593,7 @@ fun AddEditCountdownDialog(
                                     Text(
                                         text = selectedCategory,
                                         style = MaterialTheme.typography.labelSmall.copy(
-                                            fontSize = 9.sp,
+                                            fontSize = 10.sp,
                                             color = previewColor
                                         )
                                     )

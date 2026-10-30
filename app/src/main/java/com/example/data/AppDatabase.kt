@@ -4,22 +4,42 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.util.Calendar
 
-@Database(entities = [Countdown::class, AlertRule::class], version = 4, exportSchema = false)
+@Database(entities = [Countdown::class, AlertRule::class, VipContact::class], version = 5, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
 
     abstract fun countdownDao(): CountdownDao
     abstract fun alertRuleDao(): AlertRuleDao
+    abstract fun vipContactDao(): VipContactDao
 
     companion object {
         const val PREFS_SEEDS = "phone_manager_seeds"
         const val KEY_COUNTDOWNS_SEEDED = "countdowns_initial_seeded"
         const val KEY_ALERTS_SEEDED = "alerts_initial_seeded"
+
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `vip_contacts` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `contactName` TEXT NOT NULL,
+                        `phoneNumber` TEXT NOT NULL,
+                        `normalizedNumber` TEXT NOT NULL,
+                        `enabled` INTEGER NOT NULL DEFAULT 1,
+                        `createdAt` INTEGER NOT NULL,
+                        `photoUri` TEXT
+                    )
+                    """.trimIndent()
+                )
+            }
+        }
 
         @Volatile
         private var INSTANCE: AppDatabase? = null
@@ -32,6 +52,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "phone_manager_db"
                 )
+                .addMigrations(MIGRATION_4_5)
                 .fallbackToDestructiveMigration()
                 .addCallback(object : RoomDatabase.Callback() {
                     override fun onCreate(db: SupportSQLiteDatabase) {

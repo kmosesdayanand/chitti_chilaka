@@ -16,6 +16,7 @@ class PhoneManagerApplication : Application(), Configuration.Provider {
         super.onCreate()
         try {
             CountdownWorker.schedulePeriodicUpdates(this)
+            com.example.service.VipRingManager.restoreIfLeftActive(this)
         } catch (e: Exception) {
             e.printStackTrace()
         }

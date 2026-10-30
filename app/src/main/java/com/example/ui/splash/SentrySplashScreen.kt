@@ -1,11 +1,9 @@
 package com.example.ui.splash
 
-import androidx.compose.animation.AnimatedVisibility
+import android.app.Activity
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -22,6 +20,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -35,24 +34,44 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.view.WindowCompat
 import com.example.R
 import com.example.ui.theme.SentryNavy900
 import com.example.ui.theme.SentryNavy950
 import com.example.ui.theme.SentryTealGlow
 import com.example.ui.theme.SentryTealPrimary
-import com.example.ui.theme.TextPrimary
-import com.example.ui.theme.TextSecondary
 import kotlinx.coroutines.delay
 
 @Composable
 fun SentrySplashScreen(
     onSplashFinished: () -> Unit
 ) {
+    // Force status bar and navigation bar icons to light (white) on splash screen,
+    // and restore previous appearance when splash finishes.
+    val view = LocalView.current
+    if (!view.isInEditMode) {
+        DisposableEffect(Unit) {
+            val window = (view.context as? Activity)?.window
+            val insetsController = window?.let { WindowCompat.getInsetsController(it, view) }
+            val prevLightStatusBars = insetsController?.isAppearanceLightStatusBars ?: false
+            val prevLightNavBars = insetsController?.isAppearanceLightNavigationBars ?: false
+
+            insetsController?.isAppearanceLightStatusBars = false
+            insetsController?.isAppearanceLightNavigationBars = false
+
+            onDispose {
+                insetsController?.isAppearanceLightStatusBars = prevLightStatusBars
+                insetsController?.isAppearanceLightNavigationBars = prevLightNavBars
+            }
+        }
+    }
+
     var startAnimation by remember { mutableStateOf(false) }
 
     val scale by animateFloatAsState(
@@ -136,12 +155,12 @@ fun SentrySplashScreen(
 
             Spacer(modifier = Modifier.height(28.dp))
 
-            // App Name
+            // App Name (always fixed white across light and dark modes)
             Text(
                 text = "Sentry",
                 style = MaterialTheme.typography.headlineLarge.copy(
                     fontWeight = FontWeight.ExtraBold,
-                    color = TextPrimary,
+                    color = Color.White,
                     letterSpacing = 2.sp
                 )
             )

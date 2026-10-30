@@ -355,7 +355,7 @@ private fun CountdownSelectionItem(
                     .background(accentColor.copy(alpha = 0.2f)),
                 contentAlignment = Alignment.Center
             ) {
-                Text(text = countdown.emoji, fontSize = 22.sp)
+                Text(text = countdown.emoji, fontSize = 20.sp)
             }
 
             Spacer(modifier = Modifier.width(14.dp))
@@ -380,7 +380,7 @@ private fun CountdownSelectionItem(
                         Text(
                             text = countdown.category,
                             style = MaterialTheme.typography.labelSmall.copy(
-                                fontSize = 9.sp,
+                                fontSize = 10.sp,
                                 color = accentColor
                             )
                         )

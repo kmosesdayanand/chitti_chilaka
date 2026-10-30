@@ -3,13 +3,10 @@ package com.example.ui.placeholders
 import android.os.Build
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
@@ -19,24 +16,29 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BrightnessAuto
+import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.DoNotDisturbOn
 import androidx.compose.material.icons.filled.LightMode
-import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.RadioButtonChecked
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
-import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.TouchApp
+import androidx.compose.material.icons.filled.Vibration
+import androidx.compose.material.icons.filled.VolumeOff
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -47,8 +49,8 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -57,8 +59,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.luminance
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -67,10 +67,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
+import com.example.data.VipPreferences
+import com.example.data.VipSettings
+import com.example.service.VipRingManager
 import com.example.ui.theme.CyanPrimary
 import com.example.ui.theme.DeepSlate900
 import com.example.ui.theme.DeepSlate950
-import com.example.ui.theme.SurfaceSlate800
 import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
@@ -78,11 +80,11 @@ import com.example.widget.WidgetPreferences
 import com.example.widget.WidgetUpdater
 import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SettingsPlaceholderScreen(
     onThemeModeChanged: (String) -> Unit = {},
-    onDynamicColorChanged: (Boolean) -> Unit = {}
+    onDynamicColorChanged: (Boolean) -> Unit = {},
+    onNavigateToVipSetup: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -100,9 +102,10 @@ fun SettingsPlaceholderScreen(
         mutableStateOf(WidgetPreferences.isWidgetTapOpensItemEnabled(context))
     }
 
-    // Live preview controls state
-    var previewSwitchChecked by remember { mutableStateOf(true) }
-    var previewSliderValue by remember { mutableFloatStateOf(0.65f) }
+    // VIP Ring Preferences State
+    val vipPrefs = remember { VipPreferences.getInstance(context) }
+    val vipSettings by vipPrefs.vipSettingsFlow.collectAsState(initial = VipSettings())
+    var testSecondsLeft by remember { mutableStateOf<Int?>(null) }
 
     Column(
         modifier = Modifier
@@ -280,9 +283,9 @@ fun SettingsPlaceholderScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // 2. THEME COLORS LIVE PALETTE CARD
+        // 2. VIP RING (FULL-VOLUME) SECTION
         Text(
-            text = "THEME COLORS PALETTE",
+            text = "VIP CONTACTS RING",
             style = MaterialTheme.typography.labelMedium.copy(
                 color = CyanPrimary,
                 fontWeight = FontWeight.Bold,
@@ -293,141 +296,324 @@ fun SettingsPlaceholderScreen(
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .testTag("card_theme_colors_palette"),
+                .testTag("card_vip_ring_settings"),
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(containerColor = DeepSlate900)
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = "Active Color Tokens",
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = FontWeight.Bold,
-                        color = TextPrimary
-                    )
-                )
-                Text(
-                    text = if (dynamicColorEnabled && supportsDynamicColor) {
-                        "Generated in real-time from device wallpaper via Material You"
-                    } else {
-                        "Sentry custom brand theme palette"
-                    },
-                    style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
-                )
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                // Color Swatches Grid
-                val currentScheme = MaterialTheme.colorScheme
-                val colorTokens = listOf(
-                    "Primary" to currentScheme.primary,
-                    "On primary" to currentScheme.onPrimary,
-                    "Secondary" to currentScheme.secondary,
-                    "Tertiary" to currentScheme.tertiary,
-                    "Background" to currentScheme.background,
-                    "Surface" to currentScheme.surface,
-                    "Surface container" to currentScheme.surfaceContainer,
-                    "On surface" to currentScheme.onSurface,
-                    "On surface variant" to currentScheme.onSurfaceVariant,
-                    "Outline" to currentScheme.outline,
-                    "Error" to currentScheme.error
-                )
-
-                FlowRow(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    colorTokens.forEach { (name, color) ->
-                        ColorSwatchItem(name = name, color = color)
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(20.dp))
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Live Preview Row with Controls
-                Text(
-                    text = "Controls Live Preview",
-                    style = MaterialTheme.typography.titleSmall.copy(
-                        fontWeight = FontWeight.Bold,
-                        color = TextPrimary
-                    )
-                )
-                Spacer(modifier = Modifier.height(10.dp))
-
+                // Master Switch: Enable VIP ring
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Button(
-                        onClick = {},
-                        modifier = Modifier
-                            .defaultMinSize(minHeight = 48.dp)
-                            .testTag("preview_primary_button")
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("Primary")
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(CyanPrimary.copy(alpha = 0.15f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.NotificationsActive,
+                                contentDescription = null,
+                                tint = CyanPrimary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                text = "Enable VIP ring",
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = TextPrimary
+                                )
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "Emergency calls from VIP contacts ring loud, even in Silent or DND",
+                                style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary),
+                                lineHeight = 16.5.sp
+                            )
+                        }
                     }
 
-                    OutlinedButton(
-                        onClick = {},
-                        modifier = Modifier
-                            .defaultMinSize(minHeight = 48.dp)
-                            .testTag("preview_outlined_button")
-                    ) {
-                        Text("Outlined")
-                    }
+                    Spacer(modifier = Modifier.width(12.dp))
 
                     Switch(
-                        checked = previewSwitchChecked,
-                        onCheckedChange = { previewSwitchChecked = it },
+                        checked = vipSettings.vipRingEnabled,
+                        onCheckedChange = { checked ->
+                            coroutineScope.launch {
+                                vipPrefs.setVipRingEnabled(checked)
+                            }
+                        },
                         modifier = Modifier
                             .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
-                            .testTag("preview_switch")
+                            .testTag("switch_vip_ring_master")
                     )
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                if (vipSettings.vipRingEnabled) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                    Spacer(modifier = Modifier.height(14.dp))
 
-                // Live Slider Preview
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        text = "Slider Preview (${(previewSliderValue * 100).toInt()}%)",
-                        style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
-                    )
-                    Slider(
-                        value = previewSliderValue,
-                        onValueChange = { previewSliderValue = it },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("preview_slider")
-                    )
-                }
+                    // Ring Volume Slider (50% to 100%)
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.VolumeUp,
+                                    contentDescription = null,
+                                    tint = CyanPrimary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "VIP Ring volume",
+                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        color = TextPrimary
+                                    )
+                                )
+                            }
+                            Text(
+                                text = "${(vipSettings.ringVolumePercent * 100).toInt()}%",
+                                style = MaterialTheme.typography.labelLarge.copy(
+                                    color = CyanPrimary,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Slider(
+                            value = vipSettings.ringVolumePercent,
+                            onValueChange = { newVal ->
+                                coroutineScope.launch {
+                                    vipPrefs.setRingVolumePercent(newVal)
+                                }
+                            },
+                            valueRange = 0.50f..1.0f,
+                            steps = 5,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("slider_vip_ring_volume")
+                        )
+                    }
 
-                Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                    Spacer(modifier = Modifier.height(12.dp))
 
-                // Typography Sample
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(10.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHighest)
-                ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        Text(
-                            text = "Sample Title • Typography Hierarchy",
-                            style = MaterialTheme.typography.titleSmall.copy(
+                    // Switch: Override Do Not Disturb
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            modifier = Modifier.weight(1f),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.DoNotDisturbOn,
+                                contentDescription = null,
+                                tint = CyanPrimary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text(
+                                    text = "Override Do Not Disturb",
+                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = TextPrimary
+                                    )
+                                )
+                                Text(
+                                    text = "Temporarily permits all interruptions during call",
+                                    style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary),
+                                    fontSize = 11.sp
+                                )
+                            }
+                        }
+                        Switch(
+                            checked = vipSettings.overrideDnd,
+                            onCheckedChange = { checked ->
+                                coroutineScope.launch { vipPrefs.setOverrideDnd(checked) }
+                            },
+                            modifier = Modifier
+                                .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+                                .testTag("switch_vip_override_dnd")
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Switch: Also vibrate
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            modifier = Modifier.weight(1f),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Vibration,
+                                contentDescription = null,
+                                tint = CyanPrimary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text(
+                                    text = "Also vibrate",
+                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = TextPrimary
+                                    )
+                                )
+                                Text(
+                                    text = "Vibrates along with loud sound during VIP call",
+                                    style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary),
+                                    fontSize = 11.sp
+                                )
+                            }
+                        }
+                        Switch(
+                            checked = vipSettings.alsoVibrate,
+                            onCheckedChange = { checked ->
+                                coroutineScope.launch { vipPrefs.setAlsoVibrate(checked) }
+                            },
+                            modifier = Modifier
+                                .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+                                .testTag("switch_vip_also_vibrate")
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Switch: Ring even if the phone is on silent
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            modifier = Modifier.weight(1f),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.VolumeOff,
+                                contentDescription = null,
+                                tint = CyanPrimary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text(
+                                    text = "Ring even if phone is on silent",
+                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = TextPrimary
+                                    )
+                                )
+                                Text(
+                                    text = "Switches ringer mode to Normal for incoming VIP",
+                                    style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary),
+                                    fontSize = 11.sp
+                                )
+                            }
+                        }
+                        Switch(
+                            checked = vipSettings.ringOnSilent,
+                            onCheckedChange = { checked ->
+                                coroutineScope.launch { vipPrefs.setRingOnSilent(checked) }
+                            },
+                            modifier = Modifier
+                                .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+                                .testTag("switch_vip_ring_on_silent")
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Test VIP Ring button (5 seconds)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        val isTesting = testSecondsLeft != null
+                        Button(
+                            onClick = {
+                                if (isTesting) {
+                                    VipRingManager.stopTestRing(context) {
+                                        testSecondsLeft = null
+                                    }
+                                } else {
+                                    VipRingManager.startTestRing(
+                                        context = context,
+                                        onTick = { testSecondsLeft = it },
+                                        onFinished = { testSecondsLeft = null }
+                                    )
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (isTesting) MaterialTheme.colorScheme.error else CyanPrimary,
+                                contentColor = DeepSlate950
+                            ),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .defaultMinSize(minHeight = 44.dp)
+                                .testTag("button_test_vip_ring")
+                        ) {
+                            Icon(
+                                imageVector = if (isTesting) Icons.Default.Stop else Icons.Default.PlayArrow,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = if (isTesting) "Testing (${testSecondsLeft}s) - Stop" else "Test VIP ring (5s)",
                                 fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
+                                fontSize = 12.sp
                             )
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = "Material 3 dynamic typography adapts legibly to wallpaper colors, AMOLED deep blacks, and display zoom levels.",
-                            style = MaterialTheme.typography.bodySmall.copy(
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                        }
+
+                        OutlinedButton(
+                            onClick = onNavigateToVipSetup,
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier
+                                .defaultMinSize(minHeight = 44.dp)
+                                .testTag("button_open_vip_setup_from_settings")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Checklist,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
                             )
-                        )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(text = "Setup Checklist", fontSize = 12.sp)
+                        }
                     }
                 }
             }
@@ -494,7 +680,7 @@ fun SettingsPlaceholderScreen(
                                 "Tapping a home screen widget opens the main Sentry overview without focusing on the item."
                             },
                             style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary),
-                            lineHeight = 18.sp
+                            lineHeight = 16.5.sp
                         )
                     }
                 }
@@ -519,74 +705,7 @@ fun SettingsPlaceholderScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // 4. PERMISSIONS & SYSTEM INTEGRITY
-        Text(
-            text = "SYSTEM & PERMISSIONS",
-            style = MaterialTheme.typography.labelMedium.copy(
-                color = CyanPrimary,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 1.sp
-            )
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = DeepSlate900)
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                PermissionItem(
-                    icon = Icons.Default.RestartAlt,
-                    title = "Receive Boot Completed",
-                    description = "Used to re-schedule hourly widget timers after phone reboots so widgets stay accurate without internet or background draining."
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                PermissionItem(
-                    icon = Icons.Default.Storage,
-                    title = "Local Room Storage",
-                    description = "All countdowns and alert rules are saved strictly locally on your phone. No internet access or external accounts required."
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // 5. HOME SCREEN WIDGETS GUIDE
-        Text(
-            text = "AVAILABLE WIDGETS",
-            style = MaterialTheme.typography.labelMedium.copy(
-                color = CyanPrimary,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 1.sp
-            )
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = DeepSlate900)
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                WidgetGuideItem(
-                    title = "1. Sentry Countdown (2x2)",
-                    description = "Shows a big 'days left' badge, countdown title, and emoji. Configurable to any countdown with GlanceTheme system styling."
-                )
-                Spacer(modifier = Modifier.height(10.dp))
-                WidgetGuideItem(
-                    title = "2. Sentry Upcoming List (4x2)",
-                    description = "Displays the next 3 upcoming events with direct taps to open each countdown."
-                )
-                Spacer(modifier = Modifier.height(10.dp))
-                WidgetGuideItem(
-                    title = "3. Sentry Progress Ring (2x2)",
-                    description = "Features a circular elapsed time ring matching system palette with % completed."
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // 6. APP INFORMATION CARD
+        // 4. APP INFORMATION CARD
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
@@ -632,45 +751,6 @@ fun SettingsPlaceholderScreen(
 }
 
 @Composable
-private fun ColorSwatchItem(name: String, color: Color) {
-    val hexCode = String.format("#%06X", (color.toArgb() and 0x00FFFFFF))
-    val isLight = color.luminance() > 0.45f
-    val textColor = if (isLight) Color(0xFF0F172A) else Color(0xFFF8FAFC)
-
-    Box(
-        modifier = Modifier
-            .defaultMinSize(minWidth = 140.dp)
-            .clip(RoundedCornerShape(10.dp))
-            .background(color)
-            .border(
-                width = 1.dp,
-                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
-                shape = RoundedCornerShape(10.dp)
-            )
-            .padding(horizontal = 10.dp, vertical = 8.dp)
-    ) {
-        Column {
-            Text(
-                text = name,
-                style = MaterialTheme.typography.labelMedium.copy(
-                    fontWeight = FontWeight.Bold,
-                    color = textColor,
-                    fontSize = 12.sp
-                )
-            )
-            Text(
-                text = hexCode,
-                style = MaterialTheme.typography.labelSmall.copy(
-                    fontWeight = FontWeight.Medium,
-                    color = textColor.copy(alpha = 0.85f),
-                    fontSize = 10.sp
-                )
-            )
-        }
-    }
-}
-
-@Composable
 private fun ThemeOptionRow(
     title: String,
     subtitle: String,
@@ -705,7 +785,7 @@ private fun ThemeOptionRow(
             Text(
                 text = subtitle,
                 style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary),
-                fontSize = 12.sp
+                fontSize = 11.sp
             )
         }
         Icon(
@@ -713,71 +793,6 @@ private fun ThemeOptionRow(
             contentDescription = if (isSelected) "Selected" else "Not selected",
             tint = if (isSelected) CyanPrimary else TextMuted,
             modifier = Modifier.size(20.dp)
-        )
-    }
-}
-
-@Composable
-private fun PermissionItem(
-    icon: ImageVector,
-    title: String,
-    description: String
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.Top
-    ) {
-        Box(
-            modifier = Modifier
-                .size(32.dp)
-                .clip(CircleShape)
-                .background(CyanPrimary.copy(alpha = 0.12f)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = CyanPrimary,
-                modifier = Modifier.size(18.dp)
-            )
-        }
-        Spacer(modifier = Modifier.width(12.dp))
-        Column {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.bodyMedium.copy(
-                    fontWeight = FontWeight.Bold,
-                    color = TextPrimary
-                )
-            )
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = description,
-                style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary),
-                lineHeight = 18.sp
-            )
-        }
-    }
-}
-
-@Composable
-private fun WidgetGuideItem(
-    title: String,
-    description: String
-) {
-    Column {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.bodyMedium.copy(
-                fontWeight = FontWeight.Bold,
-                color = TextPrimary
-            )
-        )
-        Spacer(modifier = Modifier.height(2.dp))
-        Text(
-            text = description,
-            style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary),
-            lineHeight = 18.sp
         )
     }
 }

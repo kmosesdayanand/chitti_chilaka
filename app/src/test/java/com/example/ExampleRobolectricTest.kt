@@ -391,6 +391,121 @@ class ExampleRobolectricTest {
 
         inMemoryDb.close()
     }
+
+    @Test
+    fun `phone number matcher accurately normalizes and matches last 10 digits`() {
+        // Test user's exact example: +91 98765 43210, 098765 43210 and 9876543210 all match
+        val indianIntl = "+91 98765 43210"
+        val indianZeroPrefix = "098765 43210"
+        val indian10Digits = "9876543210"
+
+        assertTrue(com.example.util.PhoneNumberMatcher.matches(indianIntl, indianZeroPrefix))
+        assertTrue(com.example.util.PhoneNumberMatcher.matches(indianZeroPrefix, indian10Digits))
+        assertTrue(com.example.util.PhoneNumberMatcher.matches(indianIntl, indian10Digits))
+
+        // US phone formats with hyphens, parentheses and country code
+        val usStandard = "(555) 234-5678"
+        val usWithCountry = "+1 555 234 5678"
+        val usRawDigits = "5552345678"
+        assertTrue(com.example.util.PhoneNumberMatcher.matches(usStandard, usWithCountry))
+        assertTrue(com.example.util.PhoneNumberMatcher.matches(usStandard, usRawDigits))
+
+        // Different numbers must NOT match
+        assertFalse(com.example.util.PhoneNumberMatcher.matches("9876543210", "9876543211"))
+
+        // Edge case: Unknown, private or restricted callers must NEVER match
+        assertFalse(com.example.util.PhoneNumberMatcher.matches("Unknown", "9876543210"))
+        assertFalse(com.example.util.PhoneNumberMatcher.matches("Private", "9876543210"))
+        assertFalse(com.example.util.PhoneNumberMatcher.matches("Restricted", "9876543210"))
+        assertFalse(com.example.util.PhoneNumberMatcher.matches("", "9876543210"))
+        assertFalse(com.example.util.PhoneNumberMatcher.matches(null, "9876543210"))
+
+        // Short numbers / emergency codes (< 7 digits) must not match
+        assertFalse(com.example.util.PhoneNumberMatcher.matches("911", "911"))
+        assertFalse(com.example.util.PhoneNumberMatcher.matches("12345", "12345"))
+    }
+
+    @Test
+    fun `vip contact entity and dao crud operations`() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val inMemoryDb = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
+            .allowMainThreadQueries()
+            .build()
+        val dao = inMemoryDb.vipContactDao()
+
+        // Insert contact with multiple numbers as separate records
+        val contact1 = com.example.data.VipContact(
+            contactName = "Alice Smith",
+            phoneNumber = "+1 (555) 111-2222"
+        )
+        val contact2 = com.example.data.VipContact(
+            contactName = "Alice Smith",
+            phoneNumber = "+1 (555) 333-4444"
+        )
+        val id1 = dao.insertContact(contact1)
+        val id2 = dao.insertContact(contact2)
+
+        assertTrue(id1 > 0)
+        assertTrue(id2 > 0)
+        assertEquals(2, dao.getCount())
+
+        val enabledList = dao.getEnabledContactsSync()
+        assertEquals(2, enabledList.size)
+
+        // Disable contact1
+        dao.updateEnabled(id1, false)
+        val enabledAfter = dao.getEnabledContactsSync()
+        assertEquals(1, enabledAfter.size)
+        assertEquals(id2, enabledAfter[0].id)
+
+        // Delete contact2
+        dao.deleteContactById(id2)
+        assertEquals(1, dao.getCount())
+
+        // Delete all contacts
+        dao.deleteAllContacts()
+        assertEquals(0, dao.getCount())
+
+        inMemoryDb.close()
+    }
+
+    @Test
+    fun `vip preferences data store operations`() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val prefs = com.example.data.VipPreferences(context)
+
+        // Test default settings
+        val initialSettings = prefs.getVipSettings()
+        assertTrue(initialSettings.vipRingEnabled)
+        assertEquals(1.0f, initialSettings.ringVolumePercent, 0.01f)
+        assertTrue(initialSettings.overrideDnd)
+        assertTrue(initialSettings.alsoVibrate)
+        assertTrue(initialSettings.ringOnSilent)
+
+        // Update settings
+        prefs.setVipRingEnabled(false)
+        assertFalse(prefs.getVipSettings().vipRingEnabled)
+        prefs.setVipRingEnabled(true)
+
+        prefs.setRingVolumePercent(0.75f)
+        assertEquals(0.75f, prefs.getVipSettings().ringVolumePercent, 0.01f)
+
+        // Audio state saving and clearing
+        val initialState = prefs.getSavedAudioState()
+        assertFalse(initialState.isActive)
+
+        prefs.saveAudioState(ringerMode = 0, streamVolume = 3, interruptionFilter = 2)
+        val saved = prefs.getSavedAudioState()
+        assertTrue(saved.isActive)
+        assertEquals(0, saved.ringerMode)
+        assertEquals(3, saved.streamVolume)
+        assertEquals(2, saved.interruptionFilter)
+
+        prefs.clearSavedAudioState()
+        val cleared = prefs.getSavedAudioState()
+        assertFalse(cleared.isActive)
+        assertEquals(-1, cleared.ringerMode)
+    }
 }
 
 
