@@ -12,4 +12,12 @@
     <string name="tab_alerts">Alerts</string>
     <string name="tab_contacts">Contacts</string>
     <string name="tab_settings">Settings</string>
+
+    <!-- Keep Awake Quick Settings Tile & Foreground Service -->
+    <string name="keep_awake_tile_label">Keep Awake</string>
+    <string name="keep_awake_notification_channel_name">Keep Awake</string>
+    <string name="keep_awake_notification_channel_desc">Shows ongoing notification while Keep Awake is keeping the screen active</string>
+    <string name="keep_awake_notification_title">Keep Awake is on</string>
+    <string name="keep_awake_turn_off">Turn off</string>
+    <string name="keep_awake_indefinite">Screen will stay awake indefinitely</string>
 </resources>

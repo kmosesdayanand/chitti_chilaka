@@ -1,6 +1,9 @@
 package com.example.ui.placeholders
 
+import android.app.StatusBarManager
+import android.content.ComponentName
 import android.os.Build
+import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -37,6 +40,7 @@ import androidx.compose.material.icons.filled.TouchApp
 import androidx.compose.material.icons.filled.Vibration
 import androidx.compose.material.icons.filled.VolumeOff
 import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -69,6 +73,7 @@ import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.data.VipPreferences
 import com.example.data.VipSettings
+import com.example.service.KeepAwakeTileService
 import com.example.service.VipRingManager
 import com.example.ui.theme.CyanPrimary
 import com.example.ui.theme.DeepSlate900
@@ -107,6 +112,9 @@ fun SettingsPlaceholderScreen(
     val vipSettings by vipPrefs.vipSettingsFlow.collectAsState(initial = VipSettings())
     var testSecondsLeft by remember { mutableStateOf<Int?>(null) }
 
+    // Tile Guide Dialog state (for Android 12 and below or fallback)
+    var showTileGuideDialog by remember { mutableStateOf(false) }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -144,7 +152,7 @@ fun SettingsPlaceholderScreen(
                     )
                 )
                 Text(
-                    text = "Theme, system colors & widget interaction",
+                    text = "Theme, system colors & device controls",
                     style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
                 )
             }
@@ -705,7 +713,132 @@ fun SettingsPlaceholderScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // 4. APP INFORMATION CARD
+        // 4. KEEP AWAKE TILE SECTION
+        Text(
+            text = "QUICK SETTINGS TILE",
+            style = MaterialTheme.typography.labelMedium.copy(
+                color = CyanPrimary,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.sp
+            )
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("card_keep_awake_settings"),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = DeepSlate900)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(CyanPrimary.copy(alpha = 0.15f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_keep_awake_on),
+                            contentDescription = "Keep Awake",
+                            tint = CyanPrimary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Text(
+                            text = "Keep Awake tile",
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = TextPrimary
+                            )
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "Add to your notification shade",
+                            style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary),
+                            fontSize = 11.sp
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                Button(
+                    onClick = {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            try {
+                                val statusBarManager = context.getSystemService(StatusBarManager::class.java)
+                                val componentName = ComponentName(context, KeepAwakeTileService::class.java)
+                                val tileIcon = android.graphics.drawable.Icon.createWithResource(
+                                    context,
+                                    R.drawable.ic_keep_awake_on
+                                )
+                                statusBarManager?.requestAddTileService(
+                                    componentName,
+                                    context.getString(R.string.keep_awake_tile_label),
+                                    tileIcon,
+                                    context.mainExecutor
+                                ) { result ->
+                                    when (result) {
+                                        StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ADDED -> {
+                                            Toast.makeText(
+                                                context,
+                                                "Keep Awake tile added to Quick Settings",
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+                                        }
+                                        StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ALREADY_ADDED -> {
+                                            Toast.makeText(
+                                                context,
+                                                "Keep Awake tile is already in your panel",
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+                                        }
+                                        else -> {
+                                            // Request not accepted or cancelled
+                                        }
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                showTileGuideDialog = true
+                            }
+                        } else {
+                            showTileGuideDialog = true
+                        }
+                    },
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = CyanPrimary,
+                        contentColor = DeepSlate950
+                    ),
+                    modifier = Modifier
+                        .defaultMinSize(minHeight = 44.dp)
+                        .testTag("button_add_keep_awake_tile")
+                ) {
+                    Text(
+                        text = "Add",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // 5. APP INFORMATION CARD
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
@@ -747,6 +880,52 @@ fun SettingsPlaceholderScreen(
         }
 
         Spacer(modifier = Modifier.height(80.dp))
+    }
+
+    // Guide Dialog for Android 12 and below or fallback
+    if (showTileGuideDialog) {
+        AlertDialog(
+            onDismissRequest = { showTileGuideDialog = false },
+            icon = {
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_keep_awake_on),
+                    contentDescription = null,
+                    tint = CyanPrimary,
+                    modifier = Modifier.size(28.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = "Add Keep Awake Tile",
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimary
+                    )
+                )
+            },
+            text = {
+                Text(
+                    text = "Swipe down twice, tap the pencil icon, and drag the Keep Awake tile into your panel.",
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        color = TextSecondary,
+                        lineHeight = 18.5.sp
+                    )
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = { showTileGuideDialog = false },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = CyanPrimary,
+                        contentColor = DeepSlate950
+                    ),
+                    modifier = Modifier.testTag("button_dismiss_tile_guide")
+                ) {
+                    Text("Got it", fontWeight = FontWeight.Bold)
+                }
+            },
+            containerColor = DeepSlate900
+        )
     }
 }
 
