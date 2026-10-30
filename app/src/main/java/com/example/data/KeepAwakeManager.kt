@@ -2,7 +2,6 @@ package com.example.data
 
 import android.content.ComponentName
 import android.content.Context
-import android.os.Build
 import android.service.quicksettings.TileService
 import android.util.Log
 import com.example.service.KeepAwakeService
@@ -22,7 +21,7 @@ enum class KeepAwakeDuration(
     TEN_MINUTES(10, 10 * 60 * 1000L, "10 minutes", "10 min"),
     THIRTY_MINUTES(30, 30 * 60 * 1000L, "30 minutes", "30 min"),
     ONE_HOUR(60, 60 * 60 * 1000L, "1 hour", "1 hour"),
-    INFINITE(-1, 24 * 60 * 60 * 1000L, "Infinite", "Infinite");
+    INFINITE(-1, 0L, "Infinite", "Infinite");
 
     fun next(): KeepAwakeDuration = when (this) {
         OFF -> FIVE_MINUTES
@@ -37,7 +36,8 @@ enum class KeepAwakeDuration(
 data class KeepAwakeState(
     val isRunning: Boolean = false,
     val duration: KeepAwakeDuration = KeepAwakeDuration.OFF,
-    val endTimeMillis: Long = 0L
+    val endTimeMillis: Long = 0L,
+    val startTimeMillis: Long = 0L
 )
 
 object KeepAwakeManager {
@@ -55,20 +55,25 @@ object KeepAwakeManager {
     val endTimeMillis: Long
         get() = _stateFlow.value.endTimeMillis
 
+    val startTimeMillis: Long
+        get() = _stateFlow.value.startTimeMillis
+
     fun start(context: Context, duration: KeepAwakeDuration) {
         if (duration == KeepAwakeDuration.OFF) {
             stop(context)
             return
         }
+        val now = System.currentTimeMillis()
         val end = if (duration == KeepAwakeDuration.INFINITE) {
-            System.currentTimeMillis() + duration.durationMs
+            0L
         } else {
-            System.currentTimeMillis() + duration.durationMs
+            now + duration.durationMs
         }
         _stateFlow.value = KeepAwakeState(
             isRunning = true,
             duration = duration,
-            endTimeMillis = end
+            endTimeMillis = end,
+            startTimeMillis = now
         )
         KeepAwakeService.start(context, duration)
         requestTileUpdate(context)
@@ -78,17 +83,19 @@ object KeepAwakeManager {
         _stateFlow.value = KeepAwakeState(
             isRunning = false,
             duration = KeepAwakeDuration.OFF,
-            endTimeMillis = 0L
+            endTimeMillis = 0L,
+            startTimeMillis = 0L
         )
         KeepAwakeService.stop(context)
         requestTileUpdate(context)
     }
 
-    fun onServiceStarted(duration: KeepAwakeDuration, endTime: Long) {
+    fun onServiceStarted(duration: KeepAwakeDuration, endTime: Long, startTime: Long) {
         _stateFlow.value = KeepAwakeState(
             isRunning = true,
             duration = duration,
-            endTimeMillis = endTime
+            endTimeMillis = endTime,
+            startTimeMillis = startTime
         )
     }
 
@@ -96,7 +103,8 @@ object KeepAwakeManager {
         _stateFlow.value = KeepAwakeState(
             isRunning = false,
             duration = KeepAwakeDuration.OFF,
-            endTimeMillis = 0L
+            endTimeMillis = 0L,
+            startTimeMillis = 0L
         )
         requestTileUpdate(context)
     }
@@ -107,12 +115,14 @@ object KeepAwakeManager {
         if (state.duration == KeepAwakeDuration.INFINITE) return "Infinite"
 
         val remainingMs = (state.endTimeMillis - System.currentTimeMillis()).coerceAtLeast(0L)
+        if (remainingMs <= 0L) return "Off"
+
         val minutes = (remainingMs + 59_999L) / 60_000L
         return when {
             minutes > 60 -> "${minutes / 60}h ${minutes % 60}m"
+            minutes == 60L -> "1 hour"
             minutes > 1 -> "${minutes} min"
-            remainingMs > 0 -> "${(remainingMs / 1000L).coerceAtLeast(1)}s left"
-            else -> "Off"
+            else -> "<1 min"
         }
     }
 

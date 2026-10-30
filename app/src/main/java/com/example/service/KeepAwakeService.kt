@@ -82,9 +82,11 @@ class KeepAwakeService : Service() {
     private var wakeLock: PowerManager.WakeLock? = null
     private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private var countdownJob: Job? = null
+    private var infiniteRenewalJob: Job? = null
 
     private var currentDuration: KeepAwakeDuration = KeepAwakeDuration.OFF
     private var endTimeMillis: Long = 0L
+    private var startTimeMillis: Long = 0L
 
     // Receiver to detect manual screen off
     private val screenOffReceiver = object : BroadcastReceiver() {
@@ -139,26 +141,35 @@ class KeepAwakeService : Service() {
 
         if (intent.action == ACTION_START) {
             val minutes = intent.getIntExtra(EXTRA_DURATION_MINUTES, 5)
-            val duration = KeepAwakeDuration.entries.firstOrNull { it.minutes == minutes }
+            val newDuration = KeepAwakeDuration.entries.firstOrNull { it.minutes == minutes }
                 ?: KeepAwakeDuration.FIVE_MINUTES
 
-            currentDuration = duration
-            endTimeMillis = if (duration == KeepAwakeDuration.INFINITE) {
-                System.currentTimeMillis() + duration.durationMs
-            } else {
-                System.currentTimeMillis() + duration.durationMs
+            val now = System.currentTimeMillis()
+            if (startTimeMillis == 0L || (newDuration == KeepAwakeDuration.INFINITE && currentDuration != KeepAwakeDuration.INFINITE)) {
+                startTimeMillis = now
             }
 
-            KeepAwakeManager.onServiceStarted(duration, endTimeMillis)
+            currentDuration = newDuration
+            endTimeMillis = if (newDuration == KeepAwakeDuration.INFINITE) {
+                0L
+            } else {
+                now + newDuration.durationMs
+            }
+
+            KeepAwakeManager.onServiceStarted(newDuration, endTimeMillis, startTimeMillis)
 
             // Acquire screen wake lock
-            acquireWakeLock(duration)
+            acquireWakeLock(newDuration)
 
-            // Start foreground notification safely
-            startForegroundNotification()
+            // Start foreground or update notification
+            postOrUpdateNotification()
 
-            // Start countdown ticker
+            // Manage timer coroutines
             startCountdownTimer()
+            startInfiniteRenewal()
+
+            // Keep QS tile in sync
+            KeepAwakeManager.requestTileUpdate(applicationContext)
         }
 
         return START_NOT_STICKY
@@ -182,7 +193,7 @@ class KeepAwakeService : Service() {
         }
 
         val timeoutMs = if (duration == KeepAwakeDuration.INFINITE) {
-            24 * 60 * 60 * 1000L // 24 hours safe limit
+            2 * 60 * 60 * 1000L // 2 hours safety limit, renewed hourly
         } else {
             duration.durationMs
         }
@@ -208,7 +219,7 @@ class KeepAwakeService : Service() {
         }
     }
 
-    private fun startForegroundNotification() {
+    private fun postOrUpdateNotification() {
         val notification = buildOngoingNotification()
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -221,17 +232,13 @@ class KeepAwakeService : Service() {
                 startForeground(NOTIFICATION_ID, notification)
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to start foreground notification", e)
+            Log.e(TAG, "startForeground failed, falling back to notify()", e)
+            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+            nm?.notify(NOTIFICATION_ID, notification)
         }
     }
 
     private fun buildOngoingNotification(): Notification {
-        val contentText = if (currentDuration == KeepAwakeDuration.INFINITE) {
-            getString(R.string.keep_awake_indefinite)
-        } else {
-            KeepAwakeManager.getRemainingFormatted()
-        }
-
         val openAppIntent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
@@ -252,10 +259,9 @@ class KeepAwakeService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        return NotificationCompat.Builder(this, CHANNEL_ID)
+        val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_keep_awake_on)
             .setContentTitle(getString(R.string.keep_awake_notification_title))
-            .setContentText(contentText)
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
@@ -265,38 +271,74 @@ class KeepAwakeService : Service() {
                 getString(R.string.keep_awake_turn_off),
                 stopPendingIntent
             )
-            .build()
-    }
 
-    private fun updateNotification() {
-        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
-        try {
-            notificationManager?.notify(NOTIFICATION_ID, buildOngoingNotification())
-        } catch (e: Exception) {
-            Log.w(TAG, "Failed to update notification", e)
+        if (currentDuration != KeepAwakeDuration.INFINITE) {
+            builder.setContentText(getString(R.string.keep_awake_status_timed))
+                .setUsesChronometer(true)
+                .setChronometerCountDown(true)
+                .setWhen(endTimeMillis)
+                .setShowWhen(true)
+        } else {
+            builder.setContentText(getString(R.string.keep_awake_status_infinite))
+                .setUsesChronometer(true)
+                .setChronometerCountDown(false)
+                .setWhen(startTimeMillis)
+                .setShowWhen(true)
         }
+
+        return builder.build()
     }
 
     private fun startCountdownTimer() {
         countdownJob?.cancel()
+        if (currentDuration == KeepAwakeDuration.INFINITE) {
+            return
+        }
+
         countdownJob = serviceScope.launch {
-            var lastReportedMinutes = -1L
             while (isActive) {
-                delay(1000L)
+                val remainingMs = endTimeMillis - System.currentTimeMillis()
+                if (remainingMs <= 0L) {
+                    Log.d(TAG, "Keep Awake duration reached -> stopping service")
+                    stopSelf()
+                    break
+                }
+                delay(remainingMs)
+                // Re-check real end time after the delay in case system clock shifted
+                if (System.currentTimeMillis() >= endTimeMillis) {
+                    Log.d(TAG, "Keep Awake duration ended naturally -> stopping service")
+                    stopSelf()
+                    break
+                }
+            }
+        }
+    }
 
-                if (currentDuration != KeepAwakeDuration.INFINITE) {
-                    val remainingMs = endTimeMillis - System.currentTimeMillis()
-                    if (remainingMs <= 0L) {
-                        Log.d(TAG, "Keep Awake duration ended naturally -> stopping service")
-                        stopSelf()
-                        break
-                    }
+    private fun startInfiniteRenewal() {
+        infiniteRenewalJob?.cancel()
+        if (currentDuration != KeepAwakeDuration.INFINITE) {
+            return
+        }
 
-                    val remainingMinutes = (remainingMs + 59_999L) / 60_000L
-                    if (remainingMinutes != lastReportedMinutes) {
-                        lastReportedMinutes = remainingMinutes
-                        updateNotification()
-                        KeepAwakeManager.requestTileUpdate(applicationContext)
+        infiniteRenewalJob = serviceScope.launch {
+            while (isActive) {
+                delay(60 * 60 * 1000L) // Wait 1 hour between renewals
+                if (isActive && currentDuration == KeepAwakeDuration.INFINITE) {
+                    try {
+                        val pm = getSystemService(Context.POWER_SERVICE) as? PowerManager
+                        if (wakeLock == null) {
+                            @Suppress("DEPRECATION")
+                            wakeLock = pm?.newWakeLock(
+                                PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ON_AFTER_RELEASE,
+                                "Sentry:KeepAwakeWakeLock"
+                            )?.apply {
+                                setReferenceCounted(false)
+                            }
+                        }
+                        wakeLock?.acquire(2 * 60 * 60 * 1000L)
+                        Log.d(TAG, "Infinite mode: wake lock safely renewed with 2-hour timeout")
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to renew wake lock in infinite mode", e)
                     }
                 }
             }
@@ -324,8 +366,11 @@ class KeepAwakeService : Service() {
         // 1. Release wake lock immediately
         releaseWakeLock()
 
-        // 2. Cancel ticker
+        // 2. Cancel timers and coroutines
         countdownJob?.cancel()
+        countdownJob = null
+        infiniteRenewalJob?.cancel()
+        infiniteRenewalJob = null
         serviceScope.cancel()
 
         // 3. Unregister receivers
@@ -336,13 +381,16 @@ class KeepAwakeService : Service() {
             unregisterReceiver(batteryReceiver)
         } catch (_: Exception) {}
 
-        // 4. Cancel notification
+        // 4. Cancel ongoing notification
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
         try {
             notificationManager?.cancel(NOTIFICATION_ID)
         } catch (_: Exception) {}
 
-        // 5. Notify manager and refresh Quick Settings tile
+        // 5. Reset start time
+        startTimeMillis = 0L
+
+        // 6. Notify manager and refresh Quick Settings tile
         KeepAwakeManager.onServiceStopped(applicationContext)
         Log.d(TAG, "KeepAwakeService destroyed and state cleaned up")
     }

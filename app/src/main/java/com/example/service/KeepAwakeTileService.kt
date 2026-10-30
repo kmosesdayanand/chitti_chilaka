@@ -17,6 +17,13 @@ class KeepAwakeTileService : TileService() {
 
     override fun onStartListening() {
         super.onStartListening()
+        // If state says running but timed mode has expired, stop it
+        if (KeepAwakeManager.isRunning) {
+            val state = KeepAwakeManager.stateFlow.value
+            if (state.duration != KeepAwakeDuration.INFINITE && state.endTimeMillis <= System.currentTimeMillis()) {
+                KeepAwakeManager.stop(applicationContext)
+            }
+        }
         updateTileState()
     }
 
@@ -27,8 +34,8 @@ class KeepAwakeTileService : TileService() {
     override fun onClick() {
         super.onClick()
 
-        // Verify if service is actually active
-        val isCurrentlyActive = KeepAwakeService.isServiceRunning && KeepAwakeManager.isRunning
+        // Use KeepAwakeManager.isRunning directly so user tap transitions immediately
+        val isCurrentlyActive = KeepAwakeManager.isRunning
         val currentDuration = if (isCurrentlyActive) {
             KeepAwakeManager.currentDuration
         } else {
@@ -44,15 +51,15 @@ class KeepAwakeTileService : TileService() {
             KeepAwakeManager.start(applicationContext, nextDuration)
         }
 
+        // Refresh immediately using KeepAwakeManager.isRunning so tile never flickers "Off"
         updateTileState()
     }
 
     private fun updateTileState() {
         val tile = qsTile ?: return
 
-        // Verify real running state to avoid being stuck on Active if service was killed
-        val isActive = KeepAwakeService.isServiceRunning && KeepAwakeManager.isRunning
-        val duration = if (isActive) KeepAwakeManager.currentDuration else KeepAwakeDuration.OFF
+        // Verify active status via KeepAwakeManager.isRunning
+        val isActive = KeepAwakeManager.isRunning
 
         tile.state = if (isActive) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
         tile.icon = Icon.createWithResource(

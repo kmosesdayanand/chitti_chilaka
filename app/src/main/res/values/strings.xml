@@ -19,5 +19,6 @@
     <string name="keep_awake_notification_channel_desc">Shows ongoing notification while Keep Awake is keeping the screen active</string>
     <string name="keep_awake_notification_title">Keep Awake is on</string>
     <string name="keep_awake_turn_off">Turn off</string>
-    <string name="keep_awake_indefinite">Screen will stay awake indefinitely</string>
+    <string name="keep_awake_status_timed">Screen will stay awake</string>
+    <string name="keep_awake_status_infinite">Keeping the screen awake</string>
 </resources>
