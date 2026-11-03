@@ -36,13 +36,15 @@ import kotlin.math.roundToInt
  *   Normal mode with volume >= 40% is left completely untouched.
  *   Test VIP ring button always runs the boost regardless of state.
  * - PART 2: Cold start fix: restoreIfLeftActive only restores leftover state when call state
- *   is IDLE and saved state is older than 2 minutes (or upon device reboot recovery).
+ *   is IDLE and saved state is older than 2 minutes or un-timestamped (or upon device reboot recovery).
  * - PART 3: Save and restore race fix:
  *   - Original state saved first and awaited before boosting (never in background task).
  *   - Boost and restore synchronized under a single Mutex.
  *   - Existing active saved state is never overwritten.
- *   - In-memory cache for settings and audio state eliminates runBlocking on DataStore.
+ *   - In-memory cache for settings and audio state with awaitSettings/awaitAudioState guarantees
+ *     accurate data without cold-start default fallbacks.
  *   - In-memory cache for enabled VIP contacts eliminates database latency during calls.
+ *   - Privacy mandate: no contact names or phone numbers are ever output to logs.
  */
 object VipRingManager {
 
@@ -114,7 +116,7 @@ object VipRingManager {
                     currentFilter != NotificationManager.INTERRUPTION_FILTER_UNKNOWN &&
                     currentFilter != -1
             if (isDndActive) {
-                Log.d(TAG, "DND is active (filter=$currentFilter) and overrideDnd=true -> qualifies for VIP boost")
+                Log.d(TAG, "DND is active and overrideDnd=true -> qualifies for VIP boost")
                 return true
             }
         }
@@ -147,6 +149,7 @@ object VipRingManager {
     /**
      * Called when an incoming call is detected from CallScreeningService or PhoneStateReceiver.
      * Guaranteed never to throw, block the system call sequence, or block on the database.
+     * Uses awaitSettings to avoid cold-start defaults.
      */
     fun onIncomingCall(context: Context, incomingNumber: String?) {
         if (incomingNumber.isNullOrBlank()) return
@@ -154,7 +157,13 @@ object VipRingManager {
         managerScope.launch {
             try {
                 val vipPrefs = VipPreferences.getInstance(context)
-                val settings = vipPrefs.getCachedSettings()
+                val settings = try {
+                    vipPrefs.awaitSettings()
+                } catch (e: Exception) {
+                    Log.w(TAG, "Could not read VIP settings from DataStore. Skipping boost.")
+                    return@launch
+                }
+
                 if (!settings.vipRingEnabled) {
                     Log.d(TAG, "VIP Ring is disabled in settings. Skipping.")
                     return@launch
@@ -174,11 +183,11 @@ object VipRingManager {
                 }
 
                 if (matchedContact == null) {
-                    Log.d(TAG, "Incoming number $incomingNumber does not match any enabled VIP contact.")
+                    Log.d(TAG, "Incoming call does not match any enabled VIP contact.")
                     return@launch
                 }
 
-                Log.i(TAG, "VIP incoming call matched: ${matchedContact.contactName} ($incomingNumber)")
+                Log.i(TAG, "VIP incoming call matched.")
                 boostVolumeForVipCallInternal(context, matchedContact.contactName, isTest = false)
             } catch (e: Exception) {
                 Log.e(TAG, "Error evaluating incoming call", e)
@@ -199,6 +208,7 @@ object VipRingManager {
      * Applies full-volume VIP boost behind audioMutex.
      * Guaranteed:
      * - Audio state saved and awaited before boosting (no background task race)
+     * - Uses awaitSettings and awaitAudioState to prevent cold start defaults
      * - Never overwrites an active saved state
      * - Only boosts if qualifying (or if isTest is true)
      */
@@ -211,7 +221,13 @@ object VipRingManager {
             val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return@withLock
             val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
             val vipPrefs = VipPreferences.getInstance(context)
-            val settings = vipPrefs.getCachedSettings()
+
+            val settings = try {
+                vipPrefs.awaitSettings()
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not read VIP settings from DataStore. Skipping boost.")
+                return@withLock
+            }
 
             // PART 1: If not a test, verify if the audio state actually qualifies for a boost
             if (!isTest && !shouldBoost(context, audioManager, notificationManager, settings)) {
@@ -220,7 +236,13 @@ object VipRingManager {
             }
 
             // PART 3: Check if an active saved state already exists; never overwrite it
-            val priorState = vipPrefs.getCachedAudioState()
+            val priorState = try {
+                vipPrefs.awaitAudioState()
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not read audio state from DataStore. Falling back to cached state.")
+                vipPrefs.getCachedAudioState()
+            }
+
             if (!priorState.isActive) {
                 val currentRingerMode = audioManager.ringerMode
                 val currentVolume = audioManager.getStreamVolume(AudioManager.STREAM_RING)
@@ -292,15 +314,18 @@ object VipRingManager {
     }
 
     /**
-     * Restores previous audio state behind audioMutex.
+     * Suspend function that restores previous audio state behind audioMutex.
+     * Completes when restore logic and persistent state clearing are done.
+     * Does NOT call VipRingService.stop() directly to prevent premature service cancellation.
      */
-    fun restorePreviousState(context: Context) {
-        managerScope.launch {
-            restorePreviousStateInternal(context)
-        }
+    suspend fun restorePreviousStateSuspend(context: Context) {
+        restorePreviousStateInternal(context)
     }
 
-    private suspend fun restorePreviousStateInternal(context: Context) = audioMutex.withLock {
+    /**
+     * Internal implementation of audio state restoration under audioMutex lock.
+     */
+    suspend fun restorePreviousStateInternal(context: Context) = audioMutex.withLock {
         try {
             Log.d(TAG, "Restoring previous audio state under mutex...")
             val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
@@ -310,7 +335,13 @@ object VipRingManager {
             // Stop fallback ringtone if playing
             stopFallbackRingtone()
 
-            val state = vipPrefs.getSavedAudioState()
+            val state = try {
+                vipPrefs.awaitAudioState()
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not read audio state during restore, falling back to cached state.")
+                vipPrefs.getCachedAudioState()
+            }
+
             if (state.isActive) {
                 // Restore STREAM_RING volume first
                 if (audioManager != null && state.streamVolume != -1) {
@@ -350,25 +381,37 @@ object VipRingManager {
                 vipPrefs.clearSavedAudioState()
             }
 
-            // Stop the monitoring service
-            VipRingService.stop(context)
-
         } catch (e: Exception) {
             Log.e(TAG, "Error restoring previous audio state", e)
         }
     }
 
     /**
-     * PART 2: Cold start fix.
+     * Non-suspending asynchronous entry point for callers without a CoroutineScope (such as BroadcastReceivers).
+     */
+    fun restorePreviousState(context: Context) {
+        managerScope.launch {
+            restorePreviousStateInternal(context)
+        }
+    }
+
+    /**
+     * PART 2 & PART 4: Cold start fix.
      * Only restores leftover state when:
      * - The phone call state is IDLE (never while ringing or offhook), and
-     * - The saved state is older than 2 minutes (or during device boot recovery).
+     * - The saved state is older than 2 minutes, or savedTimestampMillis == 0L (legacy un-timestamped state),
+     *   or during device boot recovery.
      */
     fun restoreIfLeftActive(context: Context, isBootRecovery: Boolean = false) {
         managerScope.launch {
             try {
                 val vipPrefs = VipPreferences.getInstance(context)
-                val state = vipPrefs.getSavedAudioState()
+                val state = try {
+                    vipPrefs.awaitAudioState()
+                } catch (e: Exception) {
+                    Log.w(TAG, "Could not load saved audio state for leftover check.")
+                    return@launch
+                }
                 if (!state.isActive) return@launch
 
                 val telephonyManager = context.getSystemService(Context.TELEPHONY_SERVICE) as? TelephonyManager
@@ -384,13 +427,15 @@ object VipRingManager {
                     return@launch
                 }
 
-                val ageMs = System.currentTimeMillis() - state.savedTimestampMillis
-                val isOlderThanTwoMinutes = state.savedTimestampMillis > 0L && ageMs > (2 * 60 * 1000L)
+                val now = System.currentTimeMillis()
+                // PART 4: Treat savedTimestampMillis == 0L as old so it restores when call state is idle
+                val isOld = state.savedTimestampMillis == 0L || (now - state.savedTimestampMillis) > (2 * 60 * 1000L)
 
-                if (isBootRecovery || isOlderThanTwoMinutes) {
-                    Log.i(TAG, "Detected leftover active VIP ring state (boot=$isBootRecovery, age=${ageMs / 1000}s). Restoring...")
+                if (isBootRecovery || isOld) {
+                    Log.i(TAG, "Detected leftover active VIP ring state (boot=$isBootRecovery, timestamp=${state.savedTimestampMillis}). Restoring...")
                     restorePreviousStateInternal(context)
                 } else {
+                    val ageMs = now - state.savedTimestampMillis
                     Log.d(TAG, "Active state was saved recently (${ageMs / 1000}s <= 120s). Skipping restore to avoid undoing an active VIP call.")
                 }
             } catch (e: Exception) {

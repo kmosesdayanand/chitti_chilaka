@@ -16,6 +16,7 @@ import androidx.annotation.RequiresApi
  * - NEVER silence calls
  * - ALWAYS respond with an empty CallResponse so call routing is unimpeded
  * - Trigger VipRingManager to evaluate if caller is an enabled VIP contact
+ * - Privacy mandate: Never logs phone numbers or caller details
  */
 @RequiresApi(Build.VERSION_CODES.Q)
 class SentryCallScreeningService : CallScreeningService() {
@@ -42,7 +43,7 @@ class SentryCallScreeningService : CallScreeningService() {
             if (callDetails.callDirection == Call.Details.DIRECTION_INCOMING) {
                 val handle = callDetails.handle
                 val incomingNumber = handle?.schemeSpecificPart
-                Log.d(TAG, "Incoming call received in screening service: handle=$handle, number=$incomingNumber")
+                Log.d(TAG, "Incoming call received in screening service.")
 
                 if (!incomingNumber.isNullOrBlank()) {
                     VipRingManager.onIncomingCall(applicationContext, incomingNumber)

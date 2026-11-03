@@ -10,6 +10,8 @@ import com.example.service.VipRingManager
 /**
  * Fallback BroadcastReceiver for Android 9 (API 28) and below.
  * Listens for ACTION_PHONE_STATE_CHANGED broadcasts with READ_PHONE_STATE.
+ *
+ * Privacy mandate: Never logs phone numbers or caller details.
  */
 class PhoneStateReceiver : BroadcastReceiver() {
 
@@ -28,7 +30,7 @@ class PhoneStateReceiver : BroadcastReceiver() {
                 TelephonyManager.EXTRA_STATE_RINGING -> {
                     @Suppress("DEPRECATION")
                     val incomingNumber = intent.getStringExtra(TelephonyManager.EXTRA_INCOMING_NUMBER)
-                    Log.d(TAG, "Incoming ringing call detected: $incomingNumber")
+                    Log.d(TAG, "Incoming ringing call detected.")
                     if (!incomingNumber.isNullOrBlank()) {
                         VipRingManager.onIncomingCall(context.applicationContext, incomingNumber)
                     }

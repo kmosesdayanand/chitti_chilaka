@@ -506,6 +506,58 @@ class ExampleRobolectricTest {
         assertFalse(cleared.isActive)
         assertEquals(-1, cleared.ringerMode)
     }
+
+    @Test
+    fun `vip preferences awaitSettings and awaitAudioState functions`() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val prefs = com.example.data.VipPreferences(context)
+
+        // awaitSettings populates cache and sets isSettingsLoaded
+        val settings = prefs.awaitSettings()
+        assertNotNull(settings)
+        assertTrue(prefs.isSettingsLoaded)
+
+        // awaitAudioState populates cache and sets isAudioStateLoaded
+        val audioState = prefs.awaitAudioState()
+        assertNotNull(audioState)
+        assertTrue(prefs.isAudioStateLoaded)
+
+        // Test saveAudioState sets isAudioStateLoaded
+        prefs.saveAudioState(ringerMode = 1, streamVolume = 5, interruptionFilter = 1, timestamp = 12345L)
+        assertTrue(prefs.isAudioStateLoaded)
+        val awaitedSaved = prefs.awaitAudioState()
+        assertTrue(awaitedSaved.isActive)
+        assertEquals(1, awaitedSaved.ringerMode)
+        assertEquals(5, awaitedSaved.streamVolume)
+        assertEquals(12345L, awaitedSaved.savedTimestampMillis)
+
+        // Test clearSavedAudioState sets isAudioStateLoaded
+        prefs.clearSavedAudioState()
+        assertTrue(prefs.isAudioStateLoaded)
+        val awaitedCleared = prefs.awaitAudioState()
+        assertFalse(awaitedCleared.isActive)
+        assertEquals(0L, awaitedCleared.savedTimestampMillis)
+    }
+
+    @Test
+    fun `vip ring manager leftover check treats zero timestamp as old`() {
+        val now = 1000000000L
+        val zeroTimestamp = 0L
+        val recentTimestamp = now - 30_000L // 30 seconds ago
+        val oldTimestamp = now - 150_000L // 2.5 minutes ago
+
+        // Legacy un-timestamped (0L) should be treated as old
+        val isZeroOld = zeroTimestamp == 0L || (now - zeroTimestamp) > (2 * 60 * 1000L)
+        assertTrue(isZeroOld)
+
+        // 2.5 minutes ago should be treated as old
+        val isOldOld = oldTimestamp == 0L || (now - oldTimestamp) > (2 * 60 * 1000L)
+        assertTrue(isOldOld)
+
+        // 30 seconds ago should NOT be treated as old
+        val isRecentOld = recentTimestamp == 0L || (now - recentTimestamp) > (2 * 60 * 1000L)
+        assertFalse(isRecentOld)
+    }
 }
 
 

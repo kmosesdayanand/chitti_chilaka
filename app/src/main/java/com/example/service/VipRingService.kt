@@ -14,20 +14,26 @@ import android.telephony.TelephonyManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.example.R
+import com.example.data.VipPreferences
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * Short-lived background component to monitor call state transitions (OFFHOOK, IDLE)
+ * Short-lived foreground-capable service to monitor call state transitions (OFFHOOK, IDLE)
  * and safely restore the user's previous ringer volume and DND mode when the call ends or is answered.
  *
  * Implements:
  * - TelephonyCallback (API 31+)
  * - PhoneStateListener (API < 31)
- * - 60-second safety timeout to prevent stuck max-volume if call events are dropped
+ * - 60-second safety timeout (reset while ringing) to prevent stuck max-volume if call events are dropped
+ * - Runs restore inside serviceScope and awaits completion before calling stopSelf()
+ * - Performs fallback restore in onDestroy if audio state is active and no call is ringing
  */
 class VipRingService : Service() {
 
@@ -64,6 +70,9 @@ class VipRingService : Service() {
             }
         }
     }
+
+    private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+    private val isRestoring = AtomicBoolean(false)
 
     private var telephonyManager: TelephonyManager? = null
     private var telephonyCallback: TelephonyCallback? = null
@@ -129,16 +138,37 @@ class VipRingService : Service() {
         when (state) {
             TelephonyManager.CALL_STATE_OFFHOOK -> {
                 Log.i(TAG, "Call answered (OFFHOOK). Restoring audio state.")
-                VipRingManager.restorePreviousState(applicationContext)
-                stopSelf()
+                performRestoreAndStop("Call answered (OFFHOOK)")
             }
             TelephonyManager.CALL_STATE_IDLE -> {
                 Log.i(TAG, "Call ended or missed (IDLE). Restoring audio state.")
-                VipRingManager.restorePreviousState(applicationContext)
-                stopSelf()
+                performRestoreAndStop("Call ended or missed (IDLE)")
             }
             TelephonyManager.CALL_STATE_RINGING -> {
-                Log.d(TAG, "Phone is still ringing.")
+                Log.d(TAG, "Phone is ringing. Resetting safety timeout.")
+                startSafetyTimeout()
+            }
+        }
+    }
+
+    /**
+     * Executes restore inside serviceScope, awaits completion, and then calls stopSelf().
+     * Guards against duplicate invocations across multiple call triggers.
+     */
+    private fun performRestoreAndStop(reason: String) {
+        if (isRestoring.getAndSet(true)) {
+            Log.d(TAG, "Restore already in progress, skipping trigger: $reason")
+            return
+        }
+        stopTimeout()
+        serviceScope.launch {
+            try {
+                Log.i(TAG, "Executing restore before stopping service: $reason")
+                VipRingManager.restorePreviousStateSuspend(applicationContext)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error restoring audio state ($reason)", e)
+            } finally {
+                stopSelf()
             }
         }
     }
@@ -146,12 +176,16 @@ class VipRingService : Service() {
     private fun startSafetyTimeout() {
         timeoutJob?.cancel()
         // 60-second fallback: if Telecom fails to notify IDLE/OFFHOOK, restore state automatically
-        timeoutJob = CoroutineScope(Dispatchers.Main).launch {
+        timeoutJob = serviceScope.launch {
             delay(60_000L)
             Log.w(TAG, "VIP ring 60s timeout reached. Auto-restoring audio state.")
-            VipRingManager.restorePreviousState(applicationContext)
-            stopSelf()
+            performRestoreAndStop("60s safety timeout reached")
         }
+    }
+
+    private fun stopTimeout() {
+        timeoutJob?.cancel()
+        timeoutJob = null
     }
 
     private fun unregisterCallStateListener() {
@@ -175,8 +209,30 @@ class VipRingService : Service() {
     }
 
     override fun onDestroy() {
-        timeoutJob?.cancel()
+        stopTimeout()
         unregisterCallStateListener()
+
+        // Fallback restore if destroyed while audio state is still active and call is not ringing
+        try {
+            val tm = telephonyManager ?: (getSystemService(Context.TELEPHONY_SERVICE) as? TelephonyManager)
+            val currentCallState = try {
+                tm?.callState ?: TelephonyManager.CALL_STATE_IDLE
+            } catch (_: Exception) {
+                TelephonyManager.CALL_STATE_IDLE
+            }
+            if (currentCallState != TelephonyManager.CALL_STATE_RINGING) {
+                val vipPrefs = VipPreferences.getInstance(applicationContext)
+                val audioState = vipPrefs.getCachedAudioState()
+                if (audioState.isActive) {
+                    Log.w(TAG, "VipRingService destroyed while audio state is active and call is not ringing. Triggering fallback restore.")
+                    VipRingManager.restorePreviousState(applicationContext)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error checking audio state in onDestroy", e)
+        }
+
+        serviceScope.cancel()
         super.onDestroy()
         Log.d(TAG, "VipRingService destroyed.")
     }

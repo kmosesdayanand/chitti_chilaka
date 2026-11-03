@@ -1,6 +1,7 @@
 package com.example.data
 
 import android.content.Context
+import android.util.Log
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
@@ -38,6 +39,8 @@ data class SavedAudioState(
 class VipPreferences(private val context: Context) {
 
     companion object {
+        private const val TAG = "VipPreferences"
+
         val KEY_VIP_RING_ENABLED = booleanPreferencesKey("vip_ring_enabled")
         val KEY_RING_VOLUME_PERCENT = floatPreferencesKey("vip_ring_volume_percent")
         val KEY_OVERRIDE_DND = booleanPreferencesKey("vip_override_dnd")
@@ -64,6 +67,12 @@ class VipPreferences(private val context: Context) {
     private val prefScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     @Volatile
+    private var settingsLoaded: Boolean = false
+
+    @Volatile
+    private var audioStateLoaded: Boolean = false
+
+    @Volatile
     private var cachedSettings: VipSettings = VipSettings()
 
     @Volatile
@@ -71,16 +80,29 @@ class VipPreferences(private val context: Context) {
 
     init {
         prefScope.launch {
-            vipSettingsFlow.collect { settings ->
-                cachedSettings = settings
+            try {
+                vipSettingsFlow.collect { settings ->
+                    cachedSettings = settings
+                    settingsLoaded = true
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error collecting vipSettingsFlow", e)
             }
         }
         prefScope.launch {
-            savedAudioStateFlow.collect { audioState ->
-                cachedAudioState = audioState
+            try {
+                savedAudioStateFlow.collect { audioState ->
+                    cachedAudioState = audioState
+                    audioStateLoaded = true
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error collecting savedAudioStateFlow", e)
             }
         }
     }
+
+    val isSettingsLoaded: Boolean get() = settingsLoaded
+    val isAudioStateLoaded: Boolean get() = audioStateLoaded
 
     val vipSettingsFlow: Flow<VipSettings> = context.vipPreferencesDataStore.data.map { prefs ->
         VipSettings(
@@ -106,7 +128,21 @@ class VipPreferences(private val context: Context) {
         return vipSettingsFlow.first()
     }
 
-    // In-memory instant access: removes runBlocking completely from call paths
+    /**
+     * Cold-start safe: Returns cached settings if already loaded from DataStore;
+     * otherwise awaits first emission from DataStore, caches it, marks settingsLoaded = true, and returns.
+     */
+    suspend fun awaitSettings(): VipSettings {
+        if (settingsLoaded) {
+            return cachedSettings
+        }
+        val settings = vipSettingsFlow.first()
+        cachedSettings = settings
+        settingsLoaded = true
+        return settings
+    }
+
+    // In-memory instant access
     fun getVipSettingsSync(): VipSettings = cachedSettings
     fun getCachedSettings(): VipSettings = cachedSettings
 
@@ -115,6 +151,7 @@ class VipPreferences(private val context: Context) {
             prefs[KEY_VIP_RING_ENABLED] = enabled
         }
         cachedSettings = cachedSettings.copy(vipRingEnabled = enabled)
+        settingsLoaded = true
     }
 
     suspend fun setRingVolumePercent(volume: Float) {
@@ -123,6 +160,7 @@ class VipPreferences(private val context: Context) {
             prefs[KEY_RING_VOLUME_PERCENT] = clamped
         }
         cachedSettings = cachedSettings.copy(ringVolumePercent = clamped)
+        settingsLoaded = true
     }
 
     suspend fun setOverrideDnd(enabled: Boolean) {
@@ -130,6 +168,7 @@ class VipPreferences(private val context: Context) {
             prefs[KEY_OVERRIDE_DND] = enabled
         }
         cachedSettings = cachedSettings.copy(overrideDnd = enabled)
+        settingsLoaded = true
     }
 
     suspend fun setAlsoVibrate(enabled: Boolean) {
@@ -137,6 +176,7 @@ class VipPreferences(private val context: Context) {
             prefs[KEY_ALSO_VIBRATE] = enabled
         }
         cachedSettings = cachedSettings.copy(alsoVibrate = enabled)
+        settingsLoaded = true
     }
 
     suspend fun setRingOnSilent(enabled: Boolean) {
@@ -144,11 +184,12 @@ class VipPreferences(private val context: Context) {
             prefs[KEY_RING_ON_SILENT] = enabled
         }
         cachedSettings = cachedSettings.copy(ringOnSilent = enabled)
+        settingsLoaded = true
     }
 
     /**
      * Persist previous audio state when a VIP call triggers volume boost.
-     * Only called when no VIP ring state is currently active.
+     * Updates in-memory cache immediately and marks audioStateLoaded.
      */
     suspend fun saveAudioState(
         ringerMode: Int,
@@ -170,18 +211,34 @@ class VipPreferences(private val context: Context) {
             interruptionFilter = interruptionFilter,
             savedTimestampMillis = timestamp
         )
+        audioStateLoaded = true
     }
 
     suspend fun getSavedAudioState(): SavedAudioState {
         return savedAudioStateFlow.first()
     }
 
-    // In-memory instant access: removes runBlocking completely from call paths
+    /**
+     * Cold-start safe: Returns cached audio state if already loaded from DataStore;
+     * otherwise awaits first emission from DataStore, caches it, marks audioStateLoaded = true, and returns.
+     */
+    suspend fun awaitAudioState(): SavedAudioState {
+        if (audioStateLoaded) {
+            return cachedAudioState
+        }
+        val audioState = savedAudioStateFlow.first()
+        cachedAudioState = audioState
+        audioStateLoaded = true
+        return audioState
+    }
+
+    // In-memory instant access
     fun getSavedAudioStateSync(): SavedAudioState = cachedAudioState
     fun getCachedAudioState(): SavedAudioState = cachedAudioState
 
     /**
      * Clear saved audio state when ringer mode and volume have been restored.
+     * Updates in-memory cache immediately and marks audioStateLoaded.
      */
     suspend fun clearSavedAudioState() {
         context.vipPreferencesDataStore.edit { prefs ->
@@ -192,5 +249,6 @@ class VipPreferences(private val context: Context) {
             prefs[KEY_SAVED_TIMESTAMP] = 0L
         }
         cachedAudioState = SavedAudioState()
+        audioStateLoaded = true
     }
 }
