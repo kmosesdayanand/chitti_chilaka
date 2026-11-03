@@ -101,4 +101,16 @@ object WidgetPreferences {
             .putBoolean(KEY_DYNAMIC_COLOR, enabled)
             .commit()
     }
+
+    const val KEY_NOTIFICATION_PERMISSION_ASKED = "notification_permission_asked"
+
+    fun hasAskedNotificationPermission(context: Context): Boolean {
+        return getPrefs(context).getBoolean(KEY_NOTIFICATION_PERMISSION_ASKED, false)
+    }
+
+    fun setNotificationPermissionAsked(context: Context, asked: Boolean = true) {
+        getPrefs(context).edit()
+            .putBoolean(KEY_NOTIFICATION_PERMISSION_ASKED, asked)
+            .commit()
+    }
 }

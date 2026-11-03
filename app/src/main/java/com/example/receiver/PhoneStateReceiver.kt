@@ -3,6 +3,7 @@ package com.example.receiver
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.telephony.TelephonyManager
 import android.util.Log
 import com.example.service.VipRingManager
@@ -20,6 +21,10 @@ class PhoneStateReceiver : BroadcastReceiver() {
     }
 
     override fun onReceive(context: Context, intent: Intent?) {
+        if (Build.VERSION.SDK_INT >= 29) {
+            return
+        }
+
         try {
             if (intent?.action != TelephonyManager.ACTION_PHONE_STATE_CHANGED) return
 

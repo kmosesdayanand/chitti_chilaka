@@ -41,6 +41,12 @@ class ContactsViewModel(application: Application) : AndroidViewModel(application
     private val _hasAllEssentialPermissions = MutableStateFlow(false)
     val hasAllEssentialPermissions: StateFlow<Boolean> = _hasAllEssentialPermissions.asStateFlow()
 
+    private val _isContactsPermissionGranted = MutableStateFlow(false)
+    val isContactsPermissionGranted: StateFlow<Boolean> = _isContactsPermissionGranted.asStateFlow()
+
+    private val _isCallScreeningRoleHeld = MutableStateFlow(false)
+    val isCallScreeningRoleHeld: StateFlow<Boolean> = _isCallScreeningRoleHeld.asStateFlow()
+
     private val _testRingSecondsLeft = MutableStateFlow<Int?>(null)
     val testRingSecondsLeft: StateFlow<Int?> = _testRingSecondsLeft.asStateFlow()
 
@@ -94,6 +100,8 @@ class ContactsViewModel(application: Application) : AndroidViewModel(application
         val context = getApplication<Application>()
         _permissionsChecklist.value = VipPermissionChecker.getChecklist(context)
         _hasAllEssentialPermissions.value = VipPermissionChecker.hasAllEssentialPermissions(context)
+        _isContactsPermissionGranted.value = VipPermissionChecker.isContactsPermissionGranted(context)
+        _isCallScreeningRoleHeld.value = VipPermissionChecker.isCallScreeningRoleHeld(context)
     }
 
     fun toggleContactEnabled(contact: VipContact) {

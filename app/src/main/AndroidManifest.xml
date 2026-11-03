@@ -92,7 +92,7 @@
         <!-- Boot Receiver for rescheduling widget workers upon reboot -->
         <receiver
             android:name=".worker.BootReceiver"
-            android:exported="true">
+            android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
@@ -122,7 +122,7 @@
         <!-- Fallback PhoneStateReceiver for Android 9 and below -->
         <receiver
             android:name=".receiver.PhoneStateReceiver"
-            android:exported="true">
+            android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.PHONE_STATE" />
             </intent-filter>

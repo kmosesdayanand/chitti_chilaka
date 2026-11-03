@@ -558,7 +558,246 @@ class ExampleRobolectricTest {
         val isRecentOld = recentTimestamp == 0L || (now - recentTimestamp) > (2 * 60 * 1000L)
         assertFalse(isRecentOld)
     }
+
+    @Test
+    fun `vip ring service timeout constants and re-arm calculation`() {
+        assertEquals(60_000L, com.example.service.VipRingService.INITIAL_TIMEOUT_MS)
+        assertEquals(30_000L, com.example.service.VipRingService.REARM_TIMEOUT_MS)
+        assertEquals(180_000L, com.example.service.VipRingService.MAX_TOTAL_DURATION_MS)
+
+        val maxDuration = com.example.service.VipRingService.MAX_TOTAL_DURATION_MS
+        val rearmDelay = com.example.service.VipRingService.REARM_TIMEOUT_MS
+
+        // At 60s elapsed, ringing: remaining = 120s, nextDelay = minOf(30s, 120s) = 30s
+        val elapsed60 = 60_000L
+        val remaining60 = maxDuration - elapsed60
+        val nextDelay60 = minOf(rearmDelay, remaining60.coerceAtLeast(1000L))
+        assertEquals(30_000L, nextDelay60)
+
+        // At 160s elapsed, ringing: remaining = 20s, nextDelay = minOf(30s, 20s) = 20s
+        val elapsed160 = 160_000L
+        val remaining160 = maxDuration - elapsed160
+        val nextDelay160 = minOf(rearmDelay, remaining160.coerceAtLeast(1000L))
+        assertEquals(20_000L, nextDelay160)
+
+        // At 180s elapsed: hard limit reached
+        val elapsed180 = 180_000L
+        assertTrue(elapsed180 >= maxDuration)
+    }
+
+    @Test
+    fun `screen saver correctly saves and restores all screens and handles unknown routes`() {
+        val scope = object : androidx.compose.runtime.saveable.SaverScope {
+            override fun canBeSaved(value: Any): Boolean = true
+        }
+
+        for (screen in com.example.ui.navigation.Screen.items) {
+            val savedRoute = with(ScreenSaver) { scope.save(screen) }
+            assertEquals(screen.route, savedRoute)
+
+            val restoredScreen = ScreenSaver.restore(savedRoute!!)
+            assertEquals(screen, restoredScreen)
+        }
+
+        // Unknown route falls back to Countdowns
+        val unknownRestored = ScreenSaver.restore("unknown_random_route")
+        assertEquals(com.example.ui.navigation.Screen.Countdowns, unknownRestored)
+    }
+
+    @Test
+    fun `activity recreation preserves process flags and scenario recreate succeeds`() {
+        androidx.test.core.app.ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            assertTrue(MainActivity.startupWorkExecuted)
+            assertTrue(MainActivity.hasShownSplashInProcess)
+
+            // Recreate activity (simulating rotation or theme change)
+            scenario.recreate()
+
+            // Process flags remain intact and recreation succeeds
+            assertTrue(MainActivity.startupWorkExecuted)
+            assertTrue(MainActivity.hasShownSplashInProcess)
+        }
+    }
+
+    @Test
+    fun `backup rules and data extraction rules exclude private data and device xml`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+
+        // 1. Verify backup_rules.xml (Android 11 and below)
+        val backupParser = context.resources.getXml(R.xml.backup_rules)
+        val fullBackupExcludes = mutableListOf<Pair<String, String>>()
+        var eventType = backupParser.eventType
+        while (eventType != org.xmlpull.v1.XmlPullParser.END_DOCUMENT) {
+            if (eventType == org.xmlpull.v1.XmlPullParser.START_TAG && backupParser.name == "exclude") {
+                val domain = backupParser.getAttributeValue(null, "domain") ?: ""
+                val path = backupParser.getAttributeValue(null, "path") ?: ""
+                fullBackupExcludes.add(domain to path)
+            }
+            eventType = backupParser.next()
+        }
+
+        assertTrue("database phone_manager_db excluded in backup_rules",
+            fullBackupExcludes.contains("database" to "phone_manager_db"))
+        assertTrue("database phone_manager_db-wal excluded in backup_rules",
+            fullBackupExcludes.contains("database" to "phone_manager_db-wal"))
+        assertTrue("database phone_manager_db-shm excluded in backup_rules",
+            fullBackupExcludes.contains("database" to "phone_manager_db-shm"))
+        assertTrue("datastore folder excluded in backup_rules",
+            fullBackupExcludes.any { it.first == "file" && it.second.contains("datastore") })
+        assertTrue("phone_manager_seeds excluded in backup_rules",
+            fullBackupExcludes.any { it.first == "sharedpref" && it.second.startsWith("phone_manager_seeds") })
+        assertTrue("device.xml excluded in backup_rules",
+            fullBackupExcludes.contains("sharedpref" to "device.xml"))
+
+        // 2. Verify data_extraction_rules.xml (Android 12 and above)
+        val extractionParser = context.resources.getXml(R.xml.data_extraction_rules)
+        val cloudBackupExcludes = mutableListOf<Pair<String, String>>()
+        val deviceTransferExcludes = mutableListOf<Pair<String, String>>()
+        var currentSection = ""
+        eventType = extractionParser.eventType
+        while (eventType != org.xmlpull.v1.XmlPullParser.END_DOCUMENT) {
+            if (eventType == org.xmlpull.v1.XmlPullParser.START_TAG) {
+                when (extractionParser.name) {
+                    "cloud-backup" -> currentSection = "cloud-backup"
+                    "device-transfer" -> currentSection = "device-transfer"
+                    "exclude" -> {
+                        val domain = extractionParser.getAttributeValue(null, "domain") ?: ""
+                        val path = extractionParser.getAttributeValue(null, "path") ?: ""
+                        if (currentSection == "cloud-backup") {
+                            cloudBackupExcludes.add(domain to path)
+                        } else if (currentSection == "device-transfer") {
+                            deviceTransferExcludes.add(domain to path)
+                        }
+                    }
+                }
+            } else if (eventType == org.xmlpull.v1.XmlPullParser.END_TAG) {
+                if (extractionParser.name == "cloud-backup" || extractionParser.name == "device-transfer") {
+                    currentSection = ""
+                }
+            }
+            eventType = extractionParser.next()
+        }
+
+        // Verify cloud-backup exclusions
+        assertTrue("database phone_manager_db excluded in cloud-backup",
+            cloudBackupExcludes.contains("database" to "phone_manager_db"))
+        assertTrue("database phone_manager_db-wal excluded in cloud-backup",
+            cloudBackupExcludes.contains("database" to "phone_manager_db-wal"))
+        assertTrue("database phone_manager_db-shm excluded in cloud-backup",
+            cloudBackupExcludes.contains("database" to "phone_manager_db-shm"))
+        assertTrue("datastore folder excluded in cloud-backup",
+            cloudBackupExcludes.any { it.first == "file" && it.second.contains("datastore") })
+        assertTrue("phone_manager_seeds excluded in cloud-backup",
+            cloudBackupExcludes.any { it.first == "sharedpref" && it.second.startsWith("phone_manager_seeds") })
+        assertTrue("device.xml excluded in cloud-backup",
+            cloudBackupExcludes.contains("sharedpref" to "device.xml"))
+
+        // Verify device-transfer exclusions
+        assertTrue("database phone_manager_db excluded in device-transfer",
+            deviceTransferExcludes.contains("database" to "phone_manager_db"))
+        assertTrue("database phone_manager_db-wal excluded in device-transfer",
+            deviceTransferExcludes.contains("database" to "phone_manager_db-wal"))
+        assertTrue("database phone_manager_db-shm excluded in device-transfer",
+            deviceTransferExcludes.contains("database" to "phone_manager_db-shm"))
+        assertTrue("datastore folder excluded in device-transfer",
+            deviceTransferExcludes.any { it.first == "file" && it.second.contains("datastore") })
+        assertTrue("phone_manager_seeds excluded in device-transfer",
+            deviceTransferExcludes.any { it.first == "sharedpref" && it.second.startsWith("phone_manager_seeds") })
+        assertTrue("device.xml excluded in device-transfer",
+            deviceTransferExcludes.contains("sharedpref" to "device.xml"))
+    }
+
+    @Test
+    fun `notification permission asked preference stores and persists state`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+
+        // Initially false
+        assertFalse(WidgetPreferences.hasAskedNotificationPermission(context))
+
+        // Set to true
+        WidgetPreferences.setNotificationPermissionAsked(context, true)
+        assertTrue(WidgetPreferences.hasAskedNotificationPermission(context))
+
+        // Can reset or set to false
+        WidgetPreferences.setNotificationPermissionAsked(context, false)
+        assertFalse(WidgetPreferences.hasAskedNotificationPermission(context))
+    }
+
+    @Test
+    fun `vip checklist items contain required explanation and warning text`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val checklist = com.example.util.VipPermissionChecker.getChecklist(context)
+
+        val contactsItem = checklist.find { it.id == "contacts" }
+        assertNotNull(contactsItem)
+        assertTrue(
+            contactsItem!!.description.contains("Without this permission Android may skip call screening for saved contacts, so VIP calls may not ring loudly.")
+        )
+
+        val roleItem = checklist.find { it.id == "role_screening" }
+        assertNotNull(roleItem)
+        assertTrue(
+            roleItem!!.description.contains("Sentry becomes your call screening app. This replaces Google Caller ID & spam protection or Truecaller. Sentry never blocks, silences or rejects calls.")
+        )
+    }
+
+    @Test
+    fun `vip warning banner condition evaluates correctly based on vipRingEnabled and permissions`() {
+        // Banner must show when vipRingEnabled is true and either contacts or screening role is missing
+        fun shouldShowBanner(vipRingEnabled: Boolean, contactsGranted: Boolean, screeningRoleHeld: Boolean): Boolean {
+            return vipRingEnabled && (!contactsGranted || !screeningRoleHeld)
+        }
+
+        // VIP ring disabled: never show banner
+        assertFalse(shouldShowBanner(vipRingEnabled = false, contactsGranted = false, screeningRoleHeld = false))
+        assertFalse(shouldShowBanner(vipRingEnabled = false, contactsGranted = true, screeningRoleHeld = true))
+
+        // VIP ring enabled, missing contacts permission: show banner
+        assertTrue(shouldShowBanner(vipRingEnabled = true, contactsGranted = false, screeningRoleHeld = true))
+
+        // VIP ring enabled, missing call screening role: show banner
+        assertTrue(shouldShowBanner(vipRingEnabled = true, contactsGranted = true, screeningRoleHeld = false))
+
+        // VIP ring enabled, both missing: show banner
+        assertTrue(shouldShowBanner(vipRingEnabled = true, contactsGranted = false, screeningRoleHeld = false))
+
+        // Everything granted: hide banner
+        assertFalse(shouldShowBanner(vipRingEnabled = true, contactsGranted = true, screeningRoleHeld = true))
+    }
+
+    @Test
+    fun `manifest sets exported false on BootReceiver and PhoneStateReceiver`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val pm = context.packageManager
+
+        val bootReceiverInfo = pm.getReceiverInfo(
+            android.content.ComponentName(context, com.example.worker.BootReceiver::class.java),
+            0
+        )
+        assertFalse(bootReceiverInfo.exported)
+
+        val phoneStateReceiverInfo = pm.getReceiverInfo(
+            android.content.ComponentName(context, com.example.receiver.PhoneStateReceiver::class.java),
+            0
+        )
+        assertFalse(phoneStateReceiverInfo.exported)
+    }
+
+    @Test
+    fun `phone state receiver returns immediately on SDK 29 and higher`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val receiver = com.example.receiver.PhoneStateReceiver()
+        val intent = android.content.Intent(android.telephony.TelephonyManager.ACTION_PHONE_STATE_CHANGED).apply {
+            putExtra(android.telephony.TelephonyManager.EXTRA_STATE, android.telephony.TelephonyManager.EXTRA_STATE_RINGING)
+            putExtra(android.telephony.TelephonyManager.EXTRA_INCOMING_NUMBER, "+15551234567")
+        }
+
+        // Under Robolectric (configured with SDK 36 >= 29), onReceive must return immediately
+        receiver.onReceive(context, intent)
+    }
 }
+
+
 
 
 

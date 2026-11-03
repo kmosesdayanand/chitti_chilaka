@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.PhoneCallback
 import androidx.compose.material.icons.filled.PhoneInTalk
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -48,12 +49,16 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -86,6 +91,7 @@ fun VipSetupScreen(
     val checklist by viewModel.permissionsChecklist.collectAsState()
     val allGranted by viewModel.hasAllEssentialPermissions.collectAsState()
     val scrollState = rememberScrollState()
+    var showCallScreeningDialog by remember { mutableStateOf(false) }
 
     // Re-check permissions automatically whenever user resumes back from Settings
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -247,11 +253,7 @@ fun VipSetupScreen(
                             "contacts" -> contactsLauncher.launch(Manifest.permission.READ_CONTACTS)
                             "role_screening" -> {
                                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                                    val roleManager = context.getSystemService(RoleManager::class.java)
-                                    val intent = roleManager?.createRequestRoleIntent(RoleManager.ROLE_CALL_SCREENING)
-                                    if (intent != null) {
-                                        roleLauncher.launch(intent)
-                                    }
+                                    showCallScreeningDialog = true
                                 }
                             }
                             "dnd_access" -> {
@@ -316,6 +318,58 @@ fun VipSetupScreen(
 
             Spacer(modifier = Modifier.height(40.dp))
         }
+    }
+
+    if (showCallScreeningDialog) {
+        AlertDialog(
+            onDismissRequest = { showCallScreeningDialog = false },
+            title = {
+                Text(
+                    text = "Call Screening Role",
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimary
+                    )
+                )
+            },
+            text = {
+                Text(
+                    text = "Sentry becomes your call screening app. This replaces Google Caller ID & spam protection or Truecaller. Sentry never blocks, silences or rejects calls.",
+                    style = MaterialTheme.typography.bodyMedium.copy(color = TextSecondary)
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showCallScreeningDialog = false
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                            val roleManager = context.getSystemService(RoleManager::class.java)
+                            val intent = roleManager?.createRequestRoleIntent(RoleManager.ROLE_CALL_SCREENING)
+                            if (intent != null) {
+                                roleLauncher.launch(intent)
+                            }
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = CyanPrimary,
+                        contentColor = DeepSlate950
+                    ),
+                    modifier = Modifier.testTag("button_continue_call_screening")
+                ) {
+                    Text("Continue", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showCallScreeningDialog = false },
+                    modifier = Modifier.testTag("button_cancel_call_screening")
+                ) {
+                    Text("Cancel", color = TextSecondary)
+                }
+            },
+            containerColor = DeepSlate900,
+            modifier = Modifier.testTag("dialog_call_screening_explanation")
+        )
     }
 }
 

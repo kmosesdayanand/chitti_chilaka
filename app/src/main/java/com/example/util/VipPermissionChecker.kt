@@ -72,7 +72,7 @@ object VipPermissionChecker {
             VipPermissionItem(
                 id = "contacts",
                 title = "Contacts Permission",
-                description = "Required to pick VIP contacts from your address book and match incoming calls against their numbers.",
+                description = "Required to pick VIP contacts from your address book and match incoming calls against their numbers.\nWithout this permission Android may skip call screening for saved contacts, so VIP calls may not ring loudly.",
                 isGranted = isContactsPermissionGranted(context),
                 isCritical = true
             ),
@@ -80,7 +80,7 @@ object VipPermissionChecker {
                 id = "role_screening",
                 title = "Call Screening Role",
                 description = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    "Allows Sentry to identify the incoming number instantly without reading your personal call logs. Sentry never blocks or rejects calls."
+                    "Sentry becomes your call screening app. This replaces Google Caller ID & spam protection or Truecaller. Sentry never blocks, silences or rejects calls."
                 } else {
                     "Not required on Android 9 and below. Sentry uses the system phone state receiver."
                 },

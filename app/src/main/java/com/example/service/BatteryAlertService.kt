@@ -25,10 +25,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 class BatteryAlertService : Service() {
 
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val mutex = Mutex()
 
     private val batteryReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -80,43 +83,52 @@ class BatteryAlertService : Service() {
         val isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING || status == BatteryManager.BATTERY_STATUS_FULL
 
         serviceScope.launch {
-            val db = AppDatabase.getInstance(applicationContext)
-            val dao = db.alertRuleDao()
-            val enabledRules = dao.getEnabledRulesSync()
+            val rulesToTrigger = mutableListOf<Pair<AlertRule, Int>>()
 
-            if (enabledRules.isEmpty()) {
-                stopSelf()
-                return@launch
-            }
+            mutex.withLock {
+                val db = AppDatabase.getInstance(applicationContext)
+                val dao = db.alertRuleDao()
+                val enabledRules = dao.getEnabledRulesSync()
 
-            for (rule in enabledRules) {
-                if (rule.direction == AlertRule.DIRECTION_CHARGING_UP) {
-                    // Charging up crossing
-                    if (isCharging && batteryPct >= rule.level) {
-                        if (!rule.lastTriggered) {
-                            dao.updateTriggeredState(rule.id, true)
-                            triggerAlert(rule, batteryPct)
+                if (enabledRules.isEmpty()) {
+                    stopSelf()
+                    return@withLock
+                }
+
+                for (rule in enabledRules) {
+                    val currentRule = dao.getRuleByIdSync(rule.id) ?: rule
+                    if (currentRule.direction == AlertRule.DIRECTION_CHARGING_UP) {
+                        // Charging up crossing
+                        if (isCharging && batteryPct >= currentRule.level) {
+                            if (!currentRule.lastTriggered) {
+                                dao.updateTriggeredState(currentRule.id, true)
+                                rulesToTrigger.add(currentRule to batteryPct)
+                            }
+                        } else if (!isCharging || batteryPct < currentRule.level) {
+                            // Reset crossing
+                            if (currentRule.lastTriggered) {
+                                dao.updateTriggeredState(currentRule.id, false)
+                            }
                         }
-                    } else if (!isCharging || batteryPct < rule.level) {
-                        // Reset crossing
-                        if (rule.lastTriggered) {
-                            dao.updateTriggeredState(rule.id, false)
-                        }
-                    }
-                } else {
-                    // Draining down crossing
-                    if (!isCharging && batteryPct <= rule.level) {
-                        if (!rule.lastTriggered) {
-                            dao.updateTriggeredState(rule.id, true)
-                            triggerAlert(rule, batteryPct)
-                        }
-                    } else if (isCharging || batteryPct > rule.level) {
-                        // Reset crossing
-                        if (rule.lastTriggered) {
-                            dao.updateTriggeredState(rule.id, false)
+                    } else {
+                        // Draining down crossing
+                        if (!isCharging && batteryPct <= currentRule.level) {
+                            if (!currentRule.lastTriggered) {
+                                dao.updateTriggeredState(currentRule.id, true)
+                                rulesToTrigger.add(currentRule to batteryPct)
+                            }
+                        } else if (isCharging || batteryPct > currentRule.level) {
+                            // Reset crossing
+                            if (currentRule.lastTriggered) {
+                                dao.updateTriggeredState(currentRule.id, false)
+                            }
                         }
                     }
                 }
+            }
+
+            for ((rule, pct) in rulesToTrigger) {
+                triggerAlert(rule, pct)
             }
         }
     }

@@ -43,6 +43,10 @@ class VipRingService : Service() {
         private const val NOTIFICATION_ID = 2002
         private const val CHANNEL_ID = "sentry_vip_ring_channel"
 
+        const val INITIAL_TIMEOUT_MS = 60_000L
+        const val REARM_TIMEOUT_MS = 30_000L
+        const val MAX_TOTAL_DURATION_MS = 180_000L // 3 minutes
+
         fun start(context: Context, contactName: String) {
             try {
                 val intent = Intent(context, VipRingService::class.java).apply {
@@ -73,6 +77,7 @@ class VipRingService : Service() {
 
     private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private val isRestoring = AtomicBoolean(false)
+    private var serviceStartTimeMillis: Long = 0L
 
     private var telephonyManager: TelephonyManager? = null
     private var telephonyCallback: TelephonyCallback? = null
@@ -87,6 +92,9 @@ class VipRingService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        isRestoring.set(false)
+        serviceStartTimeMillis = System.currentTimeMillis()
+
         val contactName = intent?.getStringExtra(EXTRA_CONTACT_NAME) ?: "VIP Contact"
         createNotificationChannel()
 
@@ -98,7 +106,7 @@ class VipRingService : Service() {
         }
 
         registerCallStateListener()
-        startSafetyTimeout()
+        startSafetyTimeout(INITIAL_TIMEOUT_MS)
 
         return START_NOT_STICKY
     }
@@ -146,7 +154,15 @@ class VipRingService : Service() {
             }
             TelephonyManager.CALL_STATE_RINGING -> {
                 Log.d(TAG, "Phone is ringing. Resetting safety timeout.")
-                startSafetyTimeout()
+                val elapsed = System.currentTimeMillis() - serviceStartTimeMillis
+                if (elapsed >= MAX_TOTAL_DURATION_MS) {
+                    Log.w(TAG, "VIP ring 3-minute hard limit reached while ringing. Restoring audio state.")
+                    performRestoreAndStop("3-minute hard limit reached")
+                } else {
+                    val remaining = MAX_TOTAL_DURATION_MS - elapsed
+                    val delayMs = minOf(INITIAL_TIMEOUT_MS, remaining.coerceAtLeast(1000L))
+                    startSafetyTimeout(delayMs)
+                }
             }
         }
     }
@@ -173,13 +189,36 @@ class VipRingService : Service() {
         }
     }
 
-    private fun startSafetyTimeout() {
+    private fun startSafetyTimeout(delayMs: Long = INITIAL_TIMEOUT_MS) {
         timeoutJob?.cancel()
-        // 60-second fallback: if Telecom fails to notify IDLE/OFFHOOK, restore state automatically
         timeoutJob = serviceScope.launch {
-            delay(60_000L)
-            Log.w(TAG, "VIP ring 60s timeout reached. Auto-restoring audio state.")
-            performRestoreAndStop("60s safety timeout reached")
+            delay(delayMs)
+            onSafetyTimeoutFired()
+        }
+    }
+
+    private fun onSafetyTimeoutFired() {
+        val elapsed = System.currentTimeMillis() - serviceStartTimeMillis
+        if (elapsed >= MAX_TOTAL_DURATION_MS) {
+            Log.w(TAG, "VIP ring 3-minute hard limit reached. Auto-restoring audio state.")
+            performRestoreAndStop("3-minute hard limit reached")
+            return
+        }
+
+        val currentCallState = try {
+            telephonyManager?.callState ?: TelephonyManager.CALL_STATE_IDLE
+        } catch (_: Exception) {
+            TelephonyManager.CALL_STATE_IDLE
+        }
+
+        if (currentCallState == TelephonyManager.CALL_STATE_RINGING) {
+            Log.d(TAG, "Safety timeout fired but phone is still ringing. Re-arming timeout for 30s.")
+            val remaining = MAX_TOTAL_DURATION_MS - elapsed
+            val nextDelay = minOf(REARM_TIMEOUT_MS, remaining.coerceAtLeast(1000L))
+            startSafetyTimeout(nextDelay)
+        } else {
+            Log.i(TAG, "Safety timeout fired and call is no longer ringing (state=$currentCallState). Auto-restoring audio state.")
+            performRestoreAndStop("Safety timeout: call state $currentCallState")
         }
     }
 

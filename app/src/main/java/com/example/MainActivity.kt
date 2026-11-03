@@ -1,13 +1,19 @@
 package com.example
 
+import android.Manifest
 import android.app.Activity
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -20,7 +26,13 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -31,6 +43,7 @@ import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.NavigationRailItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
 import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
@@ -40,9 +53,12 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -65,7 +81,10 @@ import com.example.ui.theme.CyanPrimary
 import com.example.ui.theme.DeepSlate900
 import com.example.ui.theme.DeepSlate950
 import com.example.ui.theme.MyApplicationTheme
+import com.example.ui.theme.SurfaceSlate800
 import com.example.ui.theme.TextMuted
+import com.example.ui.theme.TextPrimary
+import com.example.ui.theme.TextSecondary
 import com.example.widget.WidgetPreferences
 import com.example.widget.WidgetUpdater
 import com.example.worker.CountdownWorker
@@ -73,7 +92,19 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
+val ScreenSaver: Saver<Screen, String> = Saver(
+    save = { it.route },
+    restore = { route -> Screen.items.firstOrNull { it.route == route } ?: Screen.Countdowns }
+)
+
 class MainActivity : ComponentActivity() {
+
+    companion object {
+        var hasShownSplashInProcess = false
+            internal set
+        var startupWorkExecuted = false
+            internal set
+    }
 
     private val countdownsViewModel: CountdownsViewModel by viewModels()
     private val alertsViewModel: AlertsViewModel by viewModels()
@@ -88,18 +119,21 @@ class MainActivity : ComponentActivity() {
         // Handle opening from widget
         handleWidgetIntent(intent)
 
-        try {
-            CountdownWorker.schedulePeriodicUpdates(applicationContext)
-            BatteryAlertService.syncWithDatabase(applicationContext)
-            VipRingManager.restoreIfLeftActive(applicationContext)
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-        CoroutineScope(Dispatchers.IO).launch {
+        if (savedInstanceState == null && !startupWorkExecuted) {
+            startupWorkExecuted = true
             try {
-                WidgetUpdater.updateAllWidgets(applicationContext)
+                CountdownWorker.schedulePeriodicUpdates(applicationContext)
+                BatteryAlertService.syncWithDatabase(applicationContext)
+                VipRingManager.restoreIfLeftActive(applicationContext)
             } catch (e: Exception) {
                 e.printStackTrace()
+            }
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    WidgetUpdater.updateAllWidgets(applicationContext)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
             }
         }
 
@@ -109,10 +143,10 @@ class MainActivity : ComponentActivity() {
             val isExpanded = windowSizeClass.widthSizeClass == WindowWidthSizeClass.Expanded
 
             val systemDark = isSystemInDarkTheme()
-            var themeMode by remember {
+            var themeMode by rememberSaveable {
                 mutableStateOf(WidgetPreferences.getThemeMode(this@MainActivity))
             }
-            var dynamicColor by remember {
+            var dynamicColor by rememberSaveable {
                 mutableStateOf(WidgetPreferences.getDynamicColor(this@MainActivity))
             }
 
@@ -139,25 +173,43 @@ class MainActivity : ComponentActivity() {
                 darkTheme = isDark,
                 dynamicColor = dynamicColor
             ) {
-                var showSplash by remember { mutableStateOf(true) }
-                var currentScreen by remember { mutableStateOf<Screen>(Screen.Countdowns) }
+                val context = LocalContext.current
+                val notificationPermissionLauncher = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.RequestPermission()
+                ) { /* Decision saved in SharedPreferences */ }
+
+                var showSplash by rememberSaveable {
+                    mutableStateOf(!hasShownSplashInProcess && savedInstanceState == null)
+                }
+                var showNotificationPermissionDialog by rememberSaveable {
+                    mutableStateOf(
+                        Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                        !WidgetPreferences.hasAskedNotificationPermission(this@MainActivity) &&
+                        ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+                    )
+                }
+                var currentScreen by rememberSaveable(stateSaver = ScreenSaver) {
+                    mutableStateOf<Screen>(Screen.Countdowns)
+                }
                 val targetId by pendingCountdownId
 
                 // When an intent with a target countdown arrives, switch to Countdowns tab and highlight
                 LaunchedEffect(targetId) {
                     if (targetId != null && targetId != -1L) {
                         showSplash = false
+                        hasShownSplashInProcess = true
                         currentScreen = Screen.Countdowns
                         countdownsViewModel.setHighlightedId(targetId)
                     }
                 }
 
                 if (showSplash) {
+                    hasShownSplashInProcess = true
                     SentrySplashScreen(
                         onSplashFinished = { showSplash = false }
                     )
                 } else {
-                    var showVipSetupScreen by remember { mutableStateOf(false) }
+                    var showVipSetupScreen by rememberSaveable { mutableStateOf(false) }
 
                     if (showVipSetupScreen) {
                         BackHandler {
@@ -252,8 +304,71 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 }
+
+                if (!showSplash && showNotificationPermissionDialog && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    AlertDialog(
+                        onDismissRequest = {
+                            WidgetPreferences.setNotificationPermissionAsked(context, true)
+                            showNotificationPermissionDialog = false
+                        },
+                        icon = {
+                            Icon(
+                                imageVector = Icons.Default.NotificationsActive,
+                                contentDescription = null,
+                                tint = CyanPrimary,
+                                modifier = Modifier.size(28.dp)
+                            )
+                        },
+                        title = {
+                            Text(
+                                text = "Notifications",
+                                style = MaterialTheme.typography.titleLarge.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = TextPrimary
+                                )
+                            )
+                        },
+                        text = {
+                            Text(
+                                text = "Sentry needs notifications for battery alerts, Keep Awake and VIP calls.",
+                                style = MaterialTheme.typography.bodyMedium.copy(color = TextSecondary)
+                            )
+                        },
+                        confirmButton = {
+                            Button(
+                                onClick = {
+                                    WidgetPreferences.setNotificationPermissionAsked(context, true)
+                                    showNotificationPermissionDialog = false
+                                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = CyanPrimary),
+                                modifier = Modifier.testTag("button_allow_notifications")
+                            ) {
+                                Text("Allow", color = DeepSlate950, fontWeight = FontWeight.Bold)
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(
+                                onClick = {
+                                    WidgetPreferences.setNotificationPermissionAsked(context, true)
+                                    showNotificationPermissionDialog = false
+                                },
+                                modifier = Modifier.testTag("button_not_now_notifications")
+                            ) {
+                                Text("Not now", color = TextSecondary)
+                            }
+                        },
+                        containerColor = SurfaceSlate800,
+                        modifier = Modifier.testTag("dialog_notification_permission")
+                    )
+                }
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        contactsViewModel.refreshPermissions()
     }
 
     override fun onNewIntent(intent: Intent) {

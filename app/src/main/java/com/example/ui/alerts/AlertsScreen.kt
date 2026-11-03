@@ -1,8 +1,11 @@
 package com.example.ui.alerts
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -146,7 +149,13 @@ fun AlertsScreen(
             )
 
             // Optional Notification Permission Hint Banner
-            AnimatedVisibility(visible = showPermissionHint) {
+            val hasNotificationPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+            } else {
+                true
+            }
+
+            AnimatedVisibility(visible = showPermissionHint && !hasNotificationPermission) {
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -155,34 +164,80 @@ fun AlertsScreen(
                     shape = RoundedCornerShape(12.dp),
                     colors = CardDefaults.cardColors(containerColor = AmberWarning.copy(alpha = 0.15f))
                 ) {
-                    Row(
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                            .padding(12.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Info,
-                            contentDescription = null,
-                            tint = AmberWarning,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text(
-                            text = "Notification permission is needed for battery alerts to sound while in the background.",
-                            style = MaterialTheme.typography.bodySmall.copy(color = TextPrimary),
-                            modifier = Modifier.weight(1f)
-                        )
-                        IconButton(
-                            onClick = { showPermissionHint = false },
-                            modifier = Modifier.size(24.dp)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = "Dismiss",
-                                tint = TextSecondary,
-                                modifier = Modifier.size(16.dp)
+                                imageVector = Icons.Default.Info,
+                                contentDescription = null,
+                                tint = AmberWarning,
+                                modifier = Modifier.size(20.dp)
                             )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(
+                                text = "Notification permission is needed for battery alerts to sound while in the background.",
+                                style = MaterialTheme.typography.bodySmall.copy(color = TextPrimary),
+                                modifier = Modifier.weight(1f)
+                            )
+                            IconButton(
+                                onClick = { showPermissionHint = false },
+                                modifier = Modifier.size(24.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Dismiss",
+                                    tint = TextSecondary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End
+                        ) {
+                            TextButton(
+                                onClick = {
+                                    val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                        Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                                            putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                                        }
+                                    } else {
+                                        Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                            data = Uri.fromParts("package", context.packageName, null)
+                                        }
+                                    }
+                                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    try {
+                                        context.startActivity(intent)
+                                    } catch (e: Exception) {
+                                        try {
+                                            val fallback = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                                data = Uri.fromParts("package", context.packageName, null)
+                                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                            }
+                                            context.startActivity(fallback)
+                                        } catch (ex: Exception) {
+                                            ex.printStackTrace()
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.testTag("button_open_notification_settings")
+                            ) {
+                                Text(
+                                    text = "Open settings",
+                                    style = MaterialTheme.typography.labelMedium.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        color = AmberWarning
+                                    )
+                                )
+                            }
                         }
                     }
                 }

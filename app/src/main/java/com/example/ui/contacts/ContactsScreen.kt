@@ -114,6 +114,9 @@ fun ContactsScreen(
     val allContacts by viewModel.allContacts.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
     val hasAllPermissions by viewModel.hasAllEssentialPermissions.collectAsState()
+    val isContactsGranted by viewModel.isContactsPermissionGranted.collectAsState()
+    val isCallScreeningRoleHeld by viewModel.isCallScreeningRoleHeld.collectAsState()
+    val vipSettings by viewModel.vipSettings.collectAsState()
 
     var showManualAddDialog by remember { mutableStateOf(false) }
     var contactToDelete by remember { mutableStateOf<VipContact?>(null) }
@@ -299,8 +302,9 @@ fun ContactsScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Warning Banner if required permissions / roles are missing
-            if (!hasAllPermissions) {
+            // Warning Banner when VIP ring is enabled but contacts permission or call screening role is missing
+            val showWarningBanner = vipSettings.vipRingEnabled && (!isContactsGranted || !isCallScreeningRoleHeld)
+            if (showWarningBanner) {
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -326,28 +330,13 @@ fun ContactsScreen(
                             modifier = Modifier.size(24.dp)
                         )
                         Spacer(modifier = Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Setup required for VIP Ring",
-                                style = MaterialTheme.typography.titleSmall.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onErrorContainer
-                                )
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = "Grant Call Screening role and DND access to enable full-volume ringing.",
-                                style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary),
-                                fontSize = 11.sp
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Set Up",
-                            style = MaterialTheme.typography.labelMedium.copy(
+                            text = "VIP ring is not fully working. Tap to fix.",
+                            style = MaterialTheme.typography.bodyMedium.copy(
                                 fontWeight = FontWeight.Bold,
-                                color = CyanPrimary
-                            )
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            ),
+                            modifier = Modifier.weight(1f)
                         )
                     }
                 }
