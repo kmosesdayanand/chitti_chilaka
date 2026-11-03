@@ -11,7 +11,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.util.Calendar
 
-@Database(entities = [Countdown::class, AlertRule::class, VipContact::class], version = 5, exportSchema = false)
+// CRITICAL: Any table or schema change must bump the database version and provide a corresponding Migration.
+// Never use fallbackToDestructiveMigration(), as it wipes user data (countdowns, alert rules, and VIP contacts).
+@Database(entities = [Countdown::class, AlertRule::class, VipContact::class], version = 5, exportSchema = true)
 abstract class AppDatabase : RoomDatabase() {
 
     abstract fun countdownDao(): CountdownDao
@@ -53,7 +55,6 @@ abstract class AppDatabase : RoomDatabase() {
                     "phone_manager_db"
                 )
                 .addMigrations(MIGRATION_4_5)
-                .fallbackToDestructiveMigration()
                 .addCallback(object : RoomDatabase.Callback() {
                     override fun onCreate(db: SupportSQLiteDatabase) {
                         super.onCreate(db)

@@ -2,7 +2,7 @@ package com.example
 
 import android.app.Application
 import androidx.work.Configuration
-import androidx.work.WorkManager
+import com.example.service.VipRingManager
 import com.example.worker.CountdownWorker
 
 class PhoneManagerApplication : Application(), Configuration.Provider {
@@ -16,7 +16,8 @@ class PhoneManagerApplication : Application(), Configuration.Provider {
         super.onCreate()
         try {
             CountdownWorker.schedulePeriodicUpdates(this)
-            com.example.service.VipRingManager.restoreIfLeftActive(this)
+            VipRingManager.init(this)
+            VipRingManager.restoreIfLeftActive(this, isBootRecovery = false)
         } catch (e: Exception) {
             e.printStackTrace()
         }

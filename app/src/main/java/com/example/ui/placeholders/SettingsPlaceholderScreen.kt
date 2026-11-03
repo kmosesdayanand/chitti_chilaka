@@ -348,6 +348,13 @@ fun SettingsPlaceholderScreen(
                                 style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary),
                                 lineHeight = 16.5.sp
                             )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Boosts only when the phone is on silent or vibrate, or ring volume is below 40%.",
+                                style = MaterialTheme.typography.bodySmall.copy(color = CyanPrimary),
+                                fontSize = 11.sp,
+                                lineHeight = 15.sp
+                            )
                         }
                     }
 

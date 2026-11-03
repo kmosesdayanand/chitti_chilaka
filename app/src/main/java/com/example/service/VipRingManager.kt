@@ -10,31 +10,55 @@ import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
+import android.telephony.TelephonyManager
 import android.util.Log
 import com.example.data.AppDatabase
+import com.example.data.VipContact
 import com.example.data.VipPreferences
+import com.example.data.VipSettings
 import com.example.util.PhoneNumberMatcher
 import com.example.util.VipPermissionChecker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlin.math.roundToInt
 
 /**
  * Core engine managing the VIP Contacts Full-Volume Ring lifecycle.
  *
- * Handles:
- * - Matching incoming numbers against enabled VIP contacts
- * - Capturing prior audio state (ringer mode, stream volume, DND interruption filter)
- * - Boosting ringer volume to target level and overriding Do Not Disturb
- * - Fallback ringtone playback when system ring is silent
- * - Restoring prior state upon call answer (OFFHOOK), hangup (IDLE), app launch, or reboot
+ * Rules:
+ * - PART 1: Boost only when needed (Silent, Vibrate, DND active, or Normal with volume < 40%).
+ *   Normal mode with volume >= 40% is left completely untouched.
+ *   Test VIP ring button always runs the boost regardless of state.
+ * - PART 2: Cold start fix: restoreIfLeftActive only restores leftover state when call state
+ *   is IDLE and saved state is older than 2 minutes (or upon device reboot recovery).
+ * - PART 3: Save and restore race fix:
+ *   - Original state saved first and awaited before boosting (never in background task).
+ *   - Boost and restore synchronized under a single Mutex.
+ *   - Existing active saved state is never overwritten.
+ *   - In-memory cache for settings and audio state eliminates runBlocking on DataStore.
+ *   - In-memory cache for enabled VIP contacts eliminates database latency during calls.
  */
 object VipRingManager {
 
     private const val TAG = "VipRingManager"
+
+    // Named constant for ring volume boost threshold ratio (40%)
+    const val BOOST_VOLUME_THRESHOLD_RATIO = 0.40f
+
+    private val audioMutex = Mutex()
+    private val managerScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+
+    @Volatile
+    private var cachedEnabledContacts: List<VipContact> = emptyList()
+
+    @Volatile
+    private var isInitialized: Boolean = false
 
     @Volatile
     private var customRingtone: Ringtone? = null
@@ -45,23 +69,106 @@ object VipRingManager {
     private var testJob: Job? = null
 
     /**
+     * Initializes background observation and in-memory caches.
+     * Called during Application.onCreate.
+     */
+    fun init(context: Context) {
+        if (isInitialized) return
+        isInitialized = true
+
+        val appContext = context.applicationContext
+        // Prime preferences instance and in-memory cache
+        VipPreferences.getInstance(appContext)
+
+        // Cache enabled VIP contacts continuously in memory
+        managerScope.launch {
+            try {
+                val db = AppDatabase.getInstance(appContext)
+                db.vipContactDao().getEnabledContactsFlow().collect { contacts ->
+                    cachedEnabledContacts = contacts
+                    Log.d(TAG, "Cached enabled VIP contacts updated: count=${contacts.size}")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error collecting enabled VIP contacts flow", e)
+            }
+        }
+    }
+
+    /**
+     * Evaluates if current audio state qualifies for VIP volume boost:
+     * - If DND is active and overrideDnd is ON -> boost (calls are silenced)
+     * - If ringer mode is Silent or Vibrate -> boost
+     * - If ringer mode is Normal and ring volume is below 40% -> boost
+     * - If ringer mode is Normal and ring volume is 40% or higher -> DO NOT boost
+     */
+    private fun shouldBoost(
+        context: Context,
+        audioManager: AudioManager,
+        notificationManager: NotificationManager?,
+        settings: VipSettings
+    ): Boolean {
+        // 1. Check Do Not Disturb
+        if (settings.overrideDnd && notificationManager != null && VipPermissionChecker.isNotificationPolicyAccessGranted(context)) {
+            val currentFilter = notificationManager.currentInterruptionFilter
+            val isDndActive = currentFilter != NotificationManager.INTERRUPTION_FILTER_ALL &&
+                    currentFilter != NotificationManager.INTERRUPTION_FILTER_UNKNOWN &&
+                    currentFilter != -1
+            if (isDndActive) {
+                Log.d(TAG, "DND is active (filter=$currentFilter) and overrideDnd=true -> qualifies for VIP boost")
+                return true
+            }
+        }
+
+        // 2. Check Ringer Mode
+        val ringerMode = audioManager.ringerMode
+        if (ringerMode == AudioManager.RINGER_MODE_SILENT || ringerMode == AudioManager.RINGER_MODE_VIBRATE) {
+            Log.d(TAG, "Ringer mode is ${if (ringerMode == AudioManager.RINGER_MODE_SILENT) "SILENT" else "VIBRATE"} -> qualifies for VIP boost")
+            return true
+        }
+
+        // 3. Normal mode volume threshold check (40%)
+        if (ringerMode == AudioManager.RINGER_MODE_NORMAL) {
+            val currentVol = audioManager.getStreamVolume(AudioManager.STREAM_RING)
+            val maxVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_RING)
+            val volumeRatio = if (maxVol > 0) currentVol.toFloat() / maxVol.toFloat() else 0f
+
+            if (volumeRatio < BOOST_VOLUME_THRESHOLD_RATIO) {
+                Log.d(TAG, "Ringer mode is NORMAL and volume ratio ($currentVol/$maxVol = ${(volumeRatio * 100).toInt()}%) < ${(BOOST_VOLUME_THRESHOLD_RATIO * 100).toInt()}% -> qualifies for VIP boost")
+                return true
+            }
+
+            Log.d(TAG, "Ringer mode is NORMAL and volume ratio ($currentVol/$maxVol = ${(volumeRatio * 100).toInt()}%) >= ${(BOOST_VOLUME_THRESHOLD_RATIO * 100).toInt()}% -> no boost needed")
+            return false
+        }
+
+        return false
+    }
+
+    /**
      * Called when an incoming call is detected from CallScreeningService or PhoneStateReceiver.
-     * Guaranteed never to throw or block the system incoming call sequence.
+     * Guaranteed never to throw, block the system call sequence, or block on the database.
      */
     fun onIncomingCall(context: Context, incomingNumber: String?) {
         if (incomingNumber.isNullOrBlank()) return
 
-        CoroutineScope(Dispatchers.IO).launch {
+        managerScope.launch {
             try {
                 val vipPrefs = VipPreferences.getInstance(context)
-                val settings = vipPrefs.getVipSettings()
+                val settings = vipPrefs.getCachedSettings()
                 if (!settings.vipRingEnabled) {
                     Log.d(TAG, "VIP Ring is disabled in settings. Skipping.")
                     return@launch
                 }
 
-                val db = AppDatabase.getInstance(context)
-                val enabledContacts = db.vipContactDao().getEnabledContactsSync()
+                // Check in-memory cache first so matching never waits on SQLite
+                var enabledContacts = cachedEnabledContacts
+                if (enabledContacts.isEmpty()) {
+                    // Fallback on cold start if flow collection has not emitted yet
+                    val db = AppDatabase.getInstance(context)
+                    enabledContacts = db.vipContactDao().getEnabledContactsSync()
+                    cachedEnabledContacts = enabledContacts
+                }
+
                 val matchedContact = enabledContacts.firstOrNull { contact ->
                     PhoneNumberMatcher.matches(incomingNumber, contact.phoneNumber)
                 }
@@ -72,7 +179,7 @@ object VipRingManager {
                 }
 
                 Log.i(TAG, "VIP incoming call matched: ${matchedContact.contactName} ($incomingNumber)")
-                boostVolumeForVipCall(context, matchedContact.contactName)
+                boostVolumeForVipCallInternal(context, matchedContact.contactName, isTest = false)
             } catch (e: Exception) {
                 Log.e(TAG, "Error evaluating incoming call", e)
             }
@@ -80,20 +187,40 @@ object VipRingManager {
     }
 
     /**
-     * Applies full-volume VIP boost, saving prior state only if not already active.
+     * Public entry point to trigger volume boost (asynchronous).
      */
-    fun boostVolumeForVipCall(context: Context, contactName: String) {
+    fun boostVolumeForVipCall(context: Context, contactName: String, isTest: Boolean = false) {
+        managerScope.launch {
+            boostVolumeForVipCallInternal(context, contactName, isTest)
+        }
+    }
+
+    /**
+     * Applies full-volume VIP boost behind audioMutex.
+     * Guaranteed:
+     * - Audio state saved and awaited before boosting (no background task race)
+     * - Never overwrites an active saved state
+     * - Only boosts if qualifying (or if isTest is true)
+     */
+    private suspend fun boostVolumeForVipCallInternal(
+        context: Context,
+        contactName: String,
+        isTest: Boolean
+    ) = audioMutex.withLock {
         try {
-            val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return
+            val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return@withLock
             val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
             val vipPrefs = VipPreferences.getInstance(context)
+            val settings = vipPrefs.getCachedSettings()
 
-            // Read current preferences and saved state synchronously
-            val settings = vipPrefs.getVipSettingsSync()
-            val priorState = vipPrefs.getSavedAudioStateSync()
+            // PART 1: If not a test, verify if the audio state actually qualifies for a boost
+            if (!isTest && !shouldBoost(context, audioManager, notificationManager, settings)) {
+                Log.i(TAG, "Audio state does not qualify for VIP boost. Keeping existing volume and settings untouched.")
+                return@withLock
+            }
 
-            // Edge Case: Two VIP calls in a row must not overwrite saved "previous state"
-            // with already-boosted values. Save only if no VIP ring is currently active.
+            // PART 3: Check if an active saved state already exists; never overwrite it
+            val priorState = vipPrefs.getCachedAudioState()
             if (!priorState.isActive) {
                 val currentRingerMode = audioManager.ringerMode
                 val currentVolume = audioManager.getStreamVolume(AudioManager.STREAM_RING)
@@ -103,16 +230,16 @@ object VipRingManager {
                     -1
                 }
 
-                Log.d(TAG, "Saving initial audio state: mode=$currentRingerMode, vol=$currentVolume, dnd=$currentFilter")
-                CoroutineScope(Dispatchers.IO).launch {
-                    vipPrefs.saveAudioState(
-                        ringerMode = currentRingerMode,
-                        streamVolume = currentVolume,
-                        interruptionFilter = currentFilter
-                    )
-                }
+                Log.d(TAG, "Saving initial audio state before boost: mode=$currentRingerMode, vol=$currentVolume, dnd=$currentFilter")
+                // Await save completion directly - never in a detached background task
+                vipPrefs.saveAudioState(
+                    ringerMode = currentRingerMode,
+                    streamVolume = currentVolume,
+                    interruptionFilter = currentFilter,
+                    timestamp = System.currentTimeMillis()
+                )
             } else {
-                Log.d(TAG, "VIP ring already active; retaining original saved state.")
+                Log.d(TAG, "VIP ring already active; retaining original saved state without overwriting.")
             }
 
             // 1. Override Do Not Disturb if enabled and permission granted
@@ -149,13 +276,15 @@ object VipRingManager {
                 triggerVibration(context)
             }
 
-            // 5. If the system ring is silent, play default ringtone via RingtoneManager
+            // 5. If system ring is silent, play fallback ringtone via RingtoneManager
             if (settings.ringOnSilent && audioManager.getStreamVolume(AudioManager.STREAM_RING) == 0) {
                 playFallbackRingtone(context)
             }
 
-            // 6. Start short-lived foreground-safe service to monitor call state until OFFHOOK/IDLE
-            VipRingService.start(context, contactName)
+            // 6. Start short-lived foreground-safe service to monitor call state until OFFHOOK/IDLE (skip during test)
+            if (!isTest) {
+                VipRingService.start(context, contactName)
+            }
 
         } catch (e: Exception) {
             Log.e(TAG, "Error applying VIP ring volume boost", e)
@@ -163,12 +292,17 @@ object VipRingManager {
     }
 
     /**
-     * Restores the audio state saved before the VIP call started.
-     * Wrapped in try/catch to guarantee safe recovery.
+     * Restores previous audio state behind audioMutex.
      */
     fun restorePreviousState(context: Context) {
+        managerScope.launch {
+            restorePreviousStateInternal(context)
+        }
+    }
+
+    private suspend fun restorePreviousStateInternal(context: Context) = audioMutex.withLock {
         try {
-            Log.d(TAG, "Restoring previous audio state...")
+            Log.d(TAG, "Restoring previous audio state under mutex...")
             val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
             val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
             val vipPrefs = VipPreferences.getInstance(context)
@@ -176,7 +310,7 @@ object VipRingManager {
             // Stop fallback ringtone if playing
             stopFallbackRingtone()
 
-            val state = vipPrefs.getSavedAudioStateSync()
+            val state = vipPrefs.getSavedAudioState()
             if (state.isActive) {
                 // Restore STREAM_RING volume first
                 if (audioManager != null && state.streamVolume != -1) {
@@ -212,10 +346,8 @@ object VipRingManager {
                     }
                 }
 
-                // Clear persisted state flags
-                CoroutineScope(Dispatchers.IO).launch {
-                    vipPrefs.clearSavedAudioState()
-                }
+                // Clear persisted state flags and wait for completion
+                vipPrefs.clearSavedAudioState()
             }
 
             // Stop the monitoring service
@@ -227,16 +359,39 @@ object VipRingManager {
     }
 
     /**
-     * Recovers state if the phone restarted or app process was recreated during an active ring.
+     * PART 2: Cold start fix.
+     * Only restores leftover state when:
+     * - The phone call state is IDLE (never while ringing or offhook), and
+     * - The saved state is older than 2 minutes (or during device boot recovery).
      */
-    fun restoreIfLeftActive(context: Context) {
-        CoroutineScope(Dispatchers.IO).launch {
+    fun restoreIfLeftActive(context: Context, isBootRecovery: Boolean = false) {
+        managerScope.launch {
             try {
                 val vipPrefs = VipPreferences.getInstance(context)
                 val state = vipPrefs.getSavedAudioState()
-                if (state.isActive) {
-                    Log.i(TAG, "Detected leftover active VIP ring state from prior session. Restoring now...")
-                    restorePreviousState(context)
+                if (!state.isActive) return@launch
+
+                val telephonyManager = context.getSystemService(Context.TELEPHONY_SERVICE) as? TelephonyManager
+                val callState = try {
+                    telephonyManager?.callState ?: TelephonyManager.CALL_STATE_IDLE
+                } catch (_: Exception) {
+                    TelephonyManager.CALL_STATE_IDLE
+                }
+
+                // Never restore if a call is actively ringing or answered
+                if (callState != TelephonyManager.CALL_STATE_IDLE) {
+                    Log.d(TAG, "Call state is not IDLE ($callState). Skipping leftover restore.")
+                    return@launch
+                }
+
+                val ageMs = System.currentTimeMillis() - state.savedTimestampMillis
+                val isOlderThanTwoMinutes = state.savedTimestampMillis > 0L && ageMs > (2 * 60 * 1000L)
+
+                if (isBootRecovery || isOlderThanTwoMinutes) {
+                    Log.i(TAG, "Detected leftover active VIP ring state (boot=$isBootRecovery, age=${ageMs / 1000}s). Restoring...")
+                    restorePreviousStateInternal(context)
+                } else {
+                    Log.d(TAG, "Active state was saved recently (${ageMs / 1000}s <= 120s). Skipping restore to avoid undoing an active VIP call.")
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error checking leftover active state", e)
@@ -244,9 +399,6 @@ object VipRingManager {
         }
     }
 
-    /**
-     * Plays the system default ringtone through RingtoneManager on STREAM_RING.
-     */
     private fun playFallbackRingtone(context: Context) {
         try {
             stopFallbackRingtone()
@@ -306,8 +458,8 @@ object VipRingManager {
     }
 
     /**
-     * Executes a 5-second test ring at the configured VIP volume,
-     * ticking remaining seconds and then restoring previous audio state.
+     * Executes a 5-second test ring at the configured VIP volume.
+     * Always runs the boost regardless of current audio state.
      */
     fun startTestRing(
         context: Context,
@@ -324,8 +476,8 @@ object VipRingManager {
 
         testJob = CoroutineScope(Dispatchers.Main).launch {
             try {
-                // Apply volume boost with test tag
-                boostVolumeForVipCall(context, "VIP Ring Test")
+                // Always force boost for the test ring (isTest = true)
+                boostVolumeForVipCallInternal(context, "VIP Ring Test", isTest = true)
                 playFallbackRingtone(context)
 
                 for (seconds in 5 downTo 1) {

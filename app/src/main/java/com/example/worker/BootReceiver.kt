@@ -21,7 +21,7 @@ class BootReceiver : BroadcastReceiver() {
             BatteryAlertService.syncWithDatabase(context)
 
             // Restore any leftover VIP ring state if interrupted by reboot or update
-            com.example.service.VipRingManager.restoreIfLeftActive(context)
+            com.example.service.VipRingManager.restoreIfLeftActive(context, isBootRecovery = true)
 
             // Immediately refresh widgets with freshly computed time left
             val pendingResult = goAsync()
