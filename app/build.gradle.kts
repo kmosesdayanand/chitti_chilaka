@@ -158,3 +158,17 @@ dependencies {
   "ksp"(libs.androidx.room.compiler)
   "ksp"(libs.moshi.kotlin.codegen)
 }
+
+val copyRoomSchemasForTests = tasks.register<Copy>("copyRoomSchemasForTests") {
+  from(layout.projectDirectory.dir("schemas"))
+  into(layout.buildDirectory.dir("intermediates/assets/debug/mergeDebugAssets"))
+  mustRunAfter(tasks.matching { it.name == "mergeDebugAssets" })
+}
+
+tasks.matching { it.name.contains("UnitTestForUnitTest") }.configureEach {
+  dependsOn(copyRoomSchemasForTests)
+}
+
+tasks.withType<Test>().configureEach {
+  dependsOn(copyRoomSchemasForTests)
+}

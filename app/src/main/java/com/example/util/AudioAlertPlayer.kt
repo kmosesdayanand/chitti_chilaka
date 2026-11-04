@@ -19,6 +19,8 @@ import kotlinx.coroutines.launch
 object AudioAlertPlayer {
 
     private const val TAG = "AudioAlertPlayer"
+    private const val PREFS_NAME = "sentry_audio_alert_prefs"
+    private const val KEY_PENDING_ALARM_VOLUME_RESTORE = "pending_alarm_volume_restore"
 
     private var mediaPlayer: MediaPlayer? = null
     private var stopJob: Job? = null
@@ -75,6 +77,10 @@ object AudioAlertPlayer {
                     val currentAlarmVol = am.getStreamVolume(AudioManager.STREAM_ALARM)
                     val maxAlarmVol = am.getStreamMaxVolume(AudioManager.STREAM_ALARM)
                     previousAlarmVolume = currentAlarmVol
+                    appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                        .edit()
+                        .putInt(KEY_PENDING_ALARM_VOLUME_RESTORE, currentAlarmVol)
+                        .apply()
                     am.setStreamVolume(AudioManager.STREAM_ALARM, maxAlarmVol, 0)
                 }
             }
@@ -307,11 +313,19 @@ object AudioAlertPlayer {
 
         // Restore original alarm stream volume if it was boosted
         try {
-            previousAlarmVolume?.let { origVol ->
+            val prefs = applicationContext?.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            val savedVol = if (prefs?.contains(KEY_PENDING_ALARM_VOLUME_RESTORE) == true) {
+                prefs.getInt(KEY_PENDING_ALARM_VOLUME_RESTORE, -1)
+            } else null
+
+            val volToRestore = previousAlarmVolume ?: if (savedVol != null && savedVol >= 0) savedVol else null
+
+            volToRestore?.let { origVol ->
                 val audioManager = applicationContext?.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
                 audioManager?.setStreamVolume(AudioManager.STREAM_ALARM, origVol, 0)
-                previousAlarmVolume = null
             }
+            previousAlarmVolume = null
+            prefs?.edit()?.remove(KEY_PENDING_ALARM_VOLUME_RESTORE)?.apply()
         } catch (e: Exception) {
             AppLog.e(TAG, "Error restoring alarm stream volume", e)
         }
@@ -328,6 +342,28 @@ object AudioAlertPlayer {
             focusRequest = null
         } catch (e: Exception) {
             AppLog.e(TAG, "Error abandoning audio focus", e)
+        }
+    }
+
+    fun restorePendingAlarmVolume(context: Context) {
+        try {
+            val appContext = context.applicationContext
+            val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            if (prefs.contains(KEY_PENDING_ALARM_VOLUME_RESTORE)) {
+                val savedVol = prefs.getInt(KEY_PENDING_ALARM_VOLUME_RESTORE, -1)
+                if (savedVol >= 0) {
+                    val audioManager = appContext.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+                    audioManager?.let { am ->
+                        val maxVol = am.getStreamMaxVolume(AudioManager.STREAM_ALARM)
+                        val targetVol = savedVol.coerceIn(0, maxVol)
+                        am.setStreamVolume(AudioManager.STREAM_ALARM, targetVol, 0)
+                        AppLog.i(TAG, "Restored pending alarm volume to $targetVol")
+                    }
+                }
+                prefs.edit().remove(KEY_PENDING_ALARM_VOLUME_RESTORE).apply()
+            }
+        } catch (e: Exception) {
+            AppLog.e(TAG, "Error restoring pending alarm volume on startup", e)
         }
     }
 }
