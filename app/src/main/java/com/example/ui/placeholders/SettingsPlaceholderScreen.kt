@@ -106,6 +106,9 @@ fun SettingsPlaceholderScreen(
     var widgetTapOpensItem by remember {
         mutableStateOf(WidgetPreferences.isWidgetTapOpensItemEnabled(context))
     }
+    var playAlertsFullVolume by remember {
+        mutableStateOf(WidgetPreferences.isPlayAlertsFullVolume(context))
+    }
 
     // VIP Ring Preferences State
     val vipPrefs = remember { VipPreferences.getInstance(context) }
@@ -720,6 +723,83 @@ fun SettingsPlaceholderScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
+        // BATTERY ALERTS SECTION
+        Text(
+            text = "BATTERY ALERTS",
+            style = MaterialTheme.typography.labelMedium.copy(
+                color = CyanPrimary,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.sp
+            )
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("card_battery_alerts_settings"),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = DeepSlate900)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(CyanPrimary.copy(alpha = 0.15f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.VolumeUp,
+                            contentDescription = null,
+                            tint = CyanPrimary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Text(
+                            text = "Play alerts at full alarm volume",
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = TextPrimary
+                            )
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "Temporarily sets alarm stream to maximum volume while alert is ringing",
+                            style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary),
+                            lineHeight = 16.5.sp
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                Switch(
+                    checked = playAlertsFullVolume,
+                    onCheckedChange = { checked ->
+                        playAlertsFullVolume = checked
+                        WidgetPreferences.setPlayAlertsFullVolume(context, checked)
+                    },
+                    modifier = Modifier
+                        .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+                        .testTag("switch_play_alerts_full_volume")
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
         // 4. KEEP AWAKE TILE SECTION
         Text(
             text = "QUICK SETTINGS TILE",
@@ -879,7 +959,7 @@ fun SettingsPlaceholderScreen(
                         )
                     )
                     Text(
-                        text = "Version 1.0 • Smart Device Monitor",
+                        text = "Version 1.0",
                         style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
                     )
                 }

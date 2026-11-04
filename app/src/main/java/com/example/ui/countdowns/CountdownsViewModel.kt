@@ -73,7 +73,7 @@ class CountdownsViewModel(application: Application) : AndroidViewModel(applicati
                 CountdownWorker.schedulePeriodicUpdates(application)
                 WidgetUpdater.updateAllWidgets(application)
             } catch (e: Exception) {
-                e.printStackTrace()
+                com.example.util.AppLog.e("CountdownsViewModel", "Failed to schedule updates or update widgets", e)
             }
         }
     }

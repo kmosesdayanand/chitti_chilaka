@@ -126,11 +126,11 @@ class KeepAwakeService : Service() {
 
         // Register screen off receiver
         val screenFilter = IntentFilter(Intent.ACTION_SCREEN_OFF)
-        registerReceiver(screenOffReceiver, screenFilter)
+        ContextCompat.registerReceiver(this, screenOffReceiver, screenFilter, ContextCompat.RECEIVER_NOT_EXPORTED)
 
         // Register battery receiver
         val batteryFilter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
-        registerReceiver(batteryReceiver, batteryFilter)
+        ContextCompat.registerReceiver(this, batteryReceiver, batteryFilter, ContextCompat.RECEIVER_NOT_EXPORTED)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {

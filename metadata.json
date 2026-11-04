@@ -1,6 +1,6 @@
 {
   "name": "Sentry",
-  "description": "Sentry - Smart device monitor and utility with battery level audio alerts, event countdowns, and glance widgets.",
+  "description": "Sentry - Device monitor and utility with battery level audio alerts, event countdowns, and glance widgets.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

@@ -2,10 +2,14 @@ package com.example.util
 
 import android.content.Context
 import android.media.AudioAttributes
+import android.media.AudioFocusRequest
+import android.media.AudioManager
 import android.media.MediaPlayer
 import android.media.RingtoneManager
 import android.net.Uri
+import android.os.Build
 import com.example.data.AlertRule
+import com.example.widget.WidgetPreferences
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -14,8 +18,13 @@ import kotlinx.coroutines.launch
 
 object AudioAlertPlayer {
 
+    private const val TAG = "AudioAlertPlayer"
+
     private var mediaPlayer: MediaPlayer? = null
     private var stopJob: Job? = null
+    private var focusRequest: AudioFocusRequest? = null
+    private var previousAlarmVolume: Int? = null
+    private var applicationContext: Context? = null
 
     @Synchronized
     fun playSound(
@@ -29,6 +38,49 @@ object AudioAlertPlayer {
         onStopCallback: (() -> Unit)? = null
     ) {
         stop()
+        val appContext = context.applicationContext
+        applicationContext = appContext
+
+        val audioManager = appContext.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+
+        // Part 11: Request audio focus with USAGE_ALARM and GAIN_TRANSIENT_MAY_DUCK
+        try {
+            val audioAttributes = AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_ALARM)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .build()
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val req = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
+                    .setAudioAttributes(audioAttributes)
+                    .build()
+                focusRequest = req
+                audioManager?.requestAudioFocus(req)
+            } else {
+                @Suppress("DEPRECATION")
+                audioManager?.requestAudioFocus(
+                    null,
+                    AudioManager.STREAM_ALARM,
+                    AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK
+                )
+            }
+        } catch (e: Exception) {
+            AppLog.e(TAG, "Failed to request audio focus", e)
+        }
+
+        // Part 12: Temporarily set alarm stream to max volume if full volume option is enabled
+        try {
+            if (WidgetPreferences.isPlayAlertsFullVolume(appContext)) {
+                audioManager?.let { am ->
+                    val currentAlarmVol = am.getStreamVolume(AudioManager.STREAM_ALARM)
+                    val maxAlarmVol = am.getStreamMaxVolume(AudioManager.STREAM_ALARM)
+                    previousAlarmVolume = currentAlarmVol
+                    am.setStreamVolume(AudioManager.STREAM_ALARM, maxAlarmVol, 0)
+                }
+            }
+        } catch (e: Exception) {
+            AppLog.e(TAG, "Failed to boost alarm stream volume", e)
+        }
 
         try {
             val player = MediaPlayer().apply {
@@ -38,6 +90,14 @@ object AudioAlertPlayer {
                         .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                         .build()
                 )
+
+                setOnErrorListener { _, what, extra ->
+                    AppLog.e(TAG, "MediaPlayer error what=$what, extra=$extra")
+                    stop()
+                    onStopCallback?.invoke()
+                    true
+                }
+
                 if (soundType == AlertRule.SOUND_VOICE_CHARGED) {
                     val afd = context.resources.openRawResourceFd(com.example.R.raw.battery_charged_alert)
                     setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
@@ -81,7 +141,7 @@ object AudioAlertPlayer {
                 onStopCallback?.invoke()
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            AppLog.e(TAG, "Failed to play audio alert, falling back to default alarm", e)
             // Fallback to default alarm sound if custom audio fails
             try {
                 val fallbackUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
@@ -93,6 +153,12 @@ object AudioAlertPlayer {
                             .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                             .build()
                     )
+                    setOnErrorListener { _, what, extra ->
+                        AppLog.e(TAG, "Fallback MediaPlayer error what=$what, extra=$extra")
+                        stop()
+                        onStopCallback?.invoke()
+                        true
+                    }
                     setDataSource(context, fallbackUri)
                     isLooping = false // PLAY ONLY ONCE
                     val clampedVol = volume.coerceIn(0f, 1f)
@@ -115,7 +181,9 @@ object AudioAlertPlayer {
                     onStopCallback?.invoke()
                 }
             } catch (ex: Exception) {
-                ex.printStackTrace()
+                AppLog.e(TAG, "Fallback audio alert also failed", ex)
+                stop()
+                onStopCallback?.invoke()
             }
         }
     }
@@ -222,6 +290,7 @@ object AudioAlertPlayer {
     fun stop() {
         stopJob?.cancel()
         stopJob = null
+
         try {
             mediaPlayer?.let {
                 if (it.isPlaying) {
@@ -231,9 +300,34 @@ object AudioAlertPlayer {
                 it.release()
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            AppLog.e(TAG, "Error releasing MediaPlayer", e)
         } finally {
             mediaPlayer = null
+        }
+
+        // Restore original alarm stream volume if it was boosted
+        try {
+            previousAlarmVolume?.let { origVol ->
+                val audioManager = applicationContext?.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+                audioManager?.setStreamVolume(AudioManager.STREAM_ALARM, origVol, 0)
+                previousAlarmVolume = null
+            }
+        } catch (e: Exception) {
+            AppLog.e(TAG, "Error restoring alarm stream volume", e)
+        }
+
+        // Abandon audio focus
+        try {
+            val audioManager = applicationContext?.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                focusRequest?.let { audioManager?.abandonAudioFocusRequest(it) }
+            } else {
+                @Suppress("DEPRECATION")
+                audioManager?.abandonAudioFocus(null)
+            }
+            focusRequest = null
+        } catch (e: Exception) {
+            AppLog.e(TAG, "Error abandoning audio focus", e)
         }
     }
 }

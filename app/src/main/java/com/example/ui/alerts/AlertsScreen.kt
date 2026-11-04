@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -108,7 +109,8 @@ fun AlertsScreen(
         modifier = modifier
             .fillMaxSize()
             .testTag("screen_alerts"),
-        containerColor = DeepSlate950
+        containerColor = DeepSlate950,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { innerPadding ->
         Column(
             modifier = Modifier
@@ -224,7 +226,7 @@ fun AlertsScreen(
                                             }
                                             context.startActivity(fallback)
                                         } catch (ex: Exception) {
-                                            ex.printStackTrace()
+                                            com.example.util.AppLog.e("AlertsScreen", "Could not open application details settings", ex)
                                         }
                                     }
                                 },

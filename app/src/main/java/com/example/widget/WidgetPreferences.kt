@@ -113,4 +113,16 @@ object WidgetPreferences {
             .putBoolean(KEY_NOTIFICATION_PERMISSION_ASKED, asked)
             .commit()
     }
+
+    const val KEY_PLAY_ALERTS_FULL_VOLUME = "play_alerts_full_volume"
+
+    fun isPlayAlertsFullVolume(context: Context): Boolean {
+        return getPrefs(context).getBoolean(KEY_PLAY_ALERTS_FULL_VOLUME, false)
+    }
+
+    fun setPlayAlertsFullVolume(context: Context, enabled: Boolean) {
+        getPrefs(context).edit()
+            .putBoolean(KEY_PLAY_ALERTS_FULL_VOLUME, enabled)
+            .commit()
+    }
 }

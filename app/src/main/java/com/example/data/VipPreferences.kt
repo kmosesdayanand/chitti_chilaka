@@ -147,43 +147,48 @@ class VipPreferences(private val context: Context) {
     fun getCachedSettings(): VipSettings = cachedSettings
 
     suspend fun setVipRingEnabled(enabled: Boolean) {
+        val current = awaitSettings()
         context.vipPreferencesDataStore.edit { prefs ->
             prefs[KEY_VIP_RING_ENABLED] = enabled
         }
-        cachedSettings = cachedSettings.copy(vipRingEnabled = enabled)
+        cachedSettings = current.copy(vipRingEnabled = enabled)
         settingsLoaded = true
     }
 
     suspend fun setRingVolumePercent(volume: Float) {
+        val current = awaitSettings()
         val clamped = volume.coerceIn(0.5f, 1.0f)
         context.vipPreferencesDataStore.edit { prefs ->
             prefs[KEY_RING_VOLUME_PERCENT] = clamped
         }
-        cachedSettings = cachedSettings.copy(ringVolumePercent = clamped)
+        cachedSettings = current.copy(ringVolumePercent = clamped)
         settingsLoaded = true
     }
 
     suspend fun setOverrideDnd(enabled: Boolean) {
+        val current = awaitSettings()
         context.vipPreferencesDataStore.edit { prefs ->
             prefs[KEY_OVERRIDE_DND] = enabled
         }
-        cachedSettings = cachedSettings.copy(overrideDnd = enabled)
+        cachedSettings = current.copy(overrideDnd = enabled)
         settingsLoaded = true
     }
 
     suspend fun setAlsoVibrate(enabled: Boolean) {
+        val current = awaitSettings()
         context.vipPreferencesDataStore.edit { prefs ->
             prefs[KEY_ALSO_VIBRATE] = enabled
         }
-        cachedSettings = cachedSettings.copy(alsoVibrate = enabled)
+        cachedSettings = current.copy(alsoVibrate = enabled)
         settingsLoaded = true
     }
 
     suspend fun setRingOnSilent(enabled: Boolean) {
+        val current = awaitSettings()
         context.vipPreferencesDataStore.edit { prefs ->
             prefs[KEY_RING_ON_SILENT] = enabled
         }
-        cachedSettings = cachedSettings.copy(ringOnSilent = enabled)
+        cachedSettings = current.copy(ringOnSilent = enabled)
         settingsLoaded = true
     }
 
@@ -241,6 +246,7 @@ class VipPreferences(private val context: Context) {
      * Updates in-memory cache immediately and marks audioStateLoaded.
      */
     suspend fun clearSavedAudioState() {
+        awaitAudioState()
         context.vipPreferencesDataStore.edit { prefs ->
             prefs[KEY_SAVED_STATE_ACTIVE] = false
             prefs[KEY_SAVED_RINGER_MODE] = -1

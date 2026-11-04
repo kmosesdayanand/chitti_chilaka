@@ -259,7 +259,7 @@ class BatteryAlertService : Service() {
         try {
             unregisterReceiver(batteryReceiver)
         } catch (e: Exception) {
-            e.printStackTrace()
+            com.example.util.AppLog.e("BatteryAlertService", "Failed to unregister battery receiver", e)
         }
         AudioAlertPlayer.stop()
         serviceScope.cancel()
@@ -287,13 +287,13 @@ class BatteryAlertService : Service() {
                             context.startService(intent)
                         }
                     } catch (e: Exception) {
-                        e.printStackTrace()
+                        com.example.util.AppLog.e("BatteryAlertService", "Failed to start BatteryAlertService", e)
                     }
                 } else {
                     try {
                         context.stopService(intent)
                     } catch (e: Exception) {
-                        e.printStackTrace()
+                        com.example.util.AppLog.e("BatteryAlertService", "Failed to stop BatteryAlertService", e)
                     }
                 }
             }

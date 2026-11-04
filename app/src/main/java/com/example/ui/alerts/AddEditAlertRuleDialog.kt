@@ -125,7 +125,7 @@ fun AddEditAlertRuleDialog(
                     Intent.FLAG_GRANT_READ_URI_PERMISSION
                 )
             } catch (e: Exception) {
-                e.printStackTrace()
+                com.example.util.AppLog.e("AddEditAlertRuleDialog", "Could not take persistable URI permission", e)
             }
             soundUri = uri.toString()
             soundType = AlertRule.SOUND_CUSTOM

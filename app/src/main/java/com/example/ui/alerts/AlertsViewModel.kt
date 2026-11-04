@@ -201,7 +201,7 @@ class AlertsViewModel(application: Application) : AndroidViewModel(application) 
         try {
             getApplication<Application>().unregisterReceiver(batteryReceiver)
         } catch (e: Exception) {
-            e.printStackTrace()
+            com.example.util.AppLog.e("AlertsViewModel", "Failed to unregister battery receiver", e)
         }
         stopTestSound()
     }

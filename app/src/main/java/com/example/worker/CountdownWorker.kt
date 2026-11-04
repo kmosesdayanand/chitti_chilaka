@@ -20,7 +20,7 @@ class CountdownWorker(
             WidgetUpdater.updateAllWidgets(appContext)
             Result.success()
         } catch (e: Exception) {
-            e.printStackTrace()
+            com.example.util.AppLog.e("CountdownWorker", "Widget update failed during worker execution", e)
             Result.retry()
         }
     }
@@ -46,7 +46,7 @@ class CountdownWorker(
                     workRequest
                 )
             } catch (e: Exception) {
-                e.printStackTrace()
+                com.example.util.AppLog.e("CountdownWorker", "Failed to schedule periodic work", e)
             }
         }
 

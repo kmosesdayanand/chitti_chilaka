@@ -396,7 +396,24 @@ object VipRingManager {
     }
 
     /**
-     * PART 2 & PART 4: Cold start fix.
+     * Determines whether leftover active audio state should be restored.
+     * Restores only when the call state is IDLE, and either:
+     * - It is a device boot recovery,
+     * - The saved timestamp is 0L (legacy un-timestamped state), or
+     * - The saved timestamp is older than 2 minutes (120,000ms).
+     */
+    internal fun shouldRestoreLeftover(
+        callState: Int,
+        savedTimestamp: Long,
+        now: Long,
+        isBootRecovery: Boolean
+    ): Boolean {
+        return callState == TelephonyManager.CALL_STATE_IDLE &&
+                (isBootRecovery || savedTimestamp == 0L || (now - savedTimestamp) > (2 * 60 * 1000L))
+    }
+
+    /**
+     * Cold start fix.
      * Only restores leftover state when:
      * - The phone call state is IDLE (never while ringing or offhook), and
      * - The saved state is older than 2 minutes, or savedTimestampMillis == 0L (legacy un-timestamped state),
@@ -421,22 +438,13 @@ object VipRingManager {
                     TelephonyManager.CALL_STATE_IDLE
                 }
 
-                // Never restore if a call is actively ringing or answered
-                if (callState != TelephonyManager.CALL_STATE_IDLE) {
-                    Log.d(TAG, "Call state is not IDLE ($callState). Skipping leftover restore.")
-                    return@launch
-                }
-
                 val now = System.currentTimeMillis()
-                // PART 4: Treat savedTimestampMillis == 0L as old so it restores when call state is idle
-                val isOld = state.savedTimestampMillis == 0L || (now - state.savedTimestampMillis) > (2 * 60 * 1000L)
-
-                if (isBootRecovery || isOld) {
+                if (shouldRestoreLeftover(callState, state.savedTimestampMillis, now, isBootRecovery)) {
                     Log.i(TAG, "Detected leftover active VIP ring state (boot=$isBootRecovery, timestamp=${state.savedTimestampMillis}). Restoring...")
                     restorePreviousStateInternal(context)
                 } else {
                     val ageMs = now - state.savedTimestampMillis
-                    Log.d(TAG, "Active state was saved recently (${ageMs / 1000}s <= 120s). Skipping restore to avoid undoing an active VIP call.")
+                    Log.d(TAG, "Active state was saved recently (${ageMs / 1000}s <= 120s) or call not idle ($callState). Skipping restore.")
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error checking leftover active state", e)

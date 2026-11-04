@@ -53,7 +53,7 @@ object WidgetUpdater {
             val ids = runCatching {
                 manager.getGlanceIds(widget.javaClass)
             }.getOrElse { error ->
-                error.printStackTrace()
+                com.example.util.AppLog.e("WidgetUpdater", "Failed to get glance ids for widget", error)
                 emptyList()
             }
 
@@ -64,7 +64,7 @@ object WidgetUpdater {
                     }
                     widget.update(context, id)
                 }.onFailure { error ->
-                    error.printStackTrace()
+                    com.example.util.AppLog.e("WidgetUpdater", "Failed to update widget instance", error)
                 }
             }
         }

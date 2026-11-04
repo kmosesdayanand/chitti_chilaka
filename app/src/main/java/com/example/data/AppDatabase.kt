@@ -15,9 +15,8 @@ import java.util.Calendar
 // Never use fallbackToDestructiveMigration(), as it wipes user data (countdowns, alert rules, and VIP contacts).
 //
 // NOTE ON SCHEMA VERSIONING & MIGRATION TESTING:
-// Schema export (exportSchema = true) was enabled starting in database version 5 (app/schemas/com.example.data.AppDatabase/5.json).
-// Because schema version 4 was not exported to JSON prior to version 5, automated Room MigrationTestHelper tests
-// will work from version 5 onwards.
+// Schema files are automatically generated into app/schemas on every build and must be committed to version control.
+// Room migrations are tested using MigrationTestHelper against exported schema JSON files (app/schemas/com.example.data.AppDatabase/<version>.json).
 @Database(entities = [Countdown::class, AlertRule::class, VipContact::class], version = 5, exportSchema = true)
 abstract class AppDatabase : RoomDatabase() {
 

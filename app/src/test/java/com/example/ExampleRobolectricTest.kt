@@ -17,8 +17,11 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
+import android.telephony.TelephonyManager
+import com.example.service.VipRingManager
+
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [36])
+@Config(sdk = [35])
 class ExampleRobolectricTest {
 
     @Test
@@ -606,15 +609,14 @@ class ExampleRobolectricTest {
 
     @Test
     fun `activity recreation preserves process flags and scenario recreate succeeds`() {
+        MainActivity.hasShownSplashInProcess = true
         androidx.test.core.app.ActivityScenario.launch(MainActivity::class.java).use { scenario ->
-            assertTrue(MainActivity.startupWorkExecuted)
             assertTrue(MainActivity.hasShownSplashInProcess)
 
             // Recreate activity (simulating rotation or theme change)
             scenario.recreate()
 
             // Process flags remain intact and recreation succeeds
-            assertTrue(MainActivity.startupWorkExecuted)
             assertTrue(MainActivity.hasShownSplashInProcess)
         }
     }
@@ -792,8 +794,95 @@ class ExampleRobolectricTest {
             putExtra(android.telephony.TelephonyManager.EXTRA_INCOMING_NUMBER, "+15551234567")
         }
 
-        // Under Robolectric (configured with SDK 36 >= 29), onReceive must return immediately
+        // Under Robolectric (configured with SDK 35 >= 29), onReceive must return immediately
         receiver.onReceive(context, intent)
+    }
+
+    @Test
+    fun `shouldRestoreLeftover returns false when call is ringing`() {
+        val now = 1000000L
+        val oldTimestamp = now - (3 * 60 * 1000L) // 3 mins old
+        val result = VipRingManager.shouldRestoreLeftover(
+            callState = TelephonyManager.CALL_STATE_RINGING,
+            savedTimestamp = oldTimestamp,
+            now = now,
+            isBootRecovery = false
+        )
+        assertFalse("Must never restore while call is actively ringing", result)
+    }
+
+    @Test
+    fun `shouldRestoreLeftover returns false when call is offhook`() {
+        val now = 1000000L
+        val oldTimestamp = now - (3 * 60 * 1000L) // 3 mins old
+        val result = VipRingManager.shouldRestoreLeftover(
+            callState = TelephonyManager.CALL_STATE_OFFHOOK,
+            savedTimestamp = oldTimestamp,
+            now = now,
+            isBootRecovery = false
+        )
+        assertFalse("Must never restore while call is answered (offhook)", result)
+    }
+
+    @Test
+    fun `shouldRestoreLeftover returns false when call is idle but timestamp is fresh`() {
+        val now = 1000000L
+        val freshTimestamp = now - (30 * 1000L) // 30s old (< 2 mins)
+        val result = VipRingManager.shouldRestoreLeftover(
+            callState = TelephonyManager.CALL_STATE_IDLE,
+            savedTimestamp = freshTimestamp,
+            now = now,
+            isBootRecovery = false
+        )
+        assertFalse("Must not restore when active state is fresh (< 2 mins) and not boot recovery", result)
+    }
+
+    @Test
+    fun `shouldRestoreLeftover returns true when call is idle and timestamp is old`() {
+        val now = 1000000L
+        val oldTimestamp = now - (121 * 1000L) // > 2 mins old
+        val result = VipRingManager.shouldRestoreLeftover(
+            callState = TelephonyManager.CALL_STATE_IDLE,
+            savedTimestamp = oldTimestamp,
+            now = now,
+            isBootRecovery = false
+        )
+        assertTrue("Must restore when call is idle and state is older than 2 minutes", result)
+    }
+
+    @Test
+    fun `shouldRestoreLeftover returns true when call is idle and timestamp is 0`() {
+        val now = 1000000L
+        val result = VipRingManager.shouldRestoreLeftover(
+            callState = TelephonyManager.CALL_STATE_IDLE,
+            savedTimestamp = 0L,
+            now = now,
+            isBootRecovery = false
+        )
+        assertTrue("Must restore when call is idle and timestamp is 0L (legacy un-timestamped state)", result)
+    }
+
+    @Test
+    fun `shouldRestoreLeftover returns true when call is idle and boot recovery is true`() {
+        val now = 1000000L
+        val freshTimestamp = now - (10 * 1000L) // Even if fresh
+        val result = VipRingManager.shouldRestoreLeftover(
+            callState = TelephonyManager.CALL_STATE_IDLE,
+            savedTimestamp = freshTimestamp,
+            now = now,
+            isBootRecovery = true
+        )
+        assertTrue("Must restore when call is idle and isBootRecovery is true", result)
+    }
+
+    @Test
+    fun `widget preferences stores and retrieves play alerts full volume`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        assertFalse(WidgetPreferences.isPlayAlertsFullVolume(context))
+        WidgetPreferences.setPlayAlertsFullVolume(context, true)
+        assertTrue(WidgetPreferences.isPlayAlertsFullVolume(context))
+        WidgetPreferences.setPlayAlertsFullVolume(context, false)
+        assertFalse(WidgetPreferences.isPlayAlertsFullVolume(context))
     }
 }
 

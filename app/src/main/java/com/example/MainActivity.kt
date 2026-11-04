@@ -65,8 +65,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
-import com.example.service.BatteryAlertService
-import com.example.service.VipRingManager
 import com.example.ui.alerts.AlertsScreen
 import com.example.ui.alerts.AlertsViewModel
 import com.example.ui.contacts.ContactsScreen
@@ -87,10 +85,6 @@ import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
 import com.example.widget.WidgetPreferences
 import com.example.widget.WidgetUpdater
-import com.example.worker.CountdownWorker
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 
 val ScreenSaver: Saver<Screen, String> = Saver(
     save = { it.route },
@@ -101,8 +95,6 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         var hasShownSplashInProcess = false
-            internal set
-        var startupWorkExecuted = false
             internal set
     }
 
@@ -118,24 +110,6 @@ class MainActivity : ComponentActivity() {
 
         // Handle opening from widget
         handleWidgetIntent(intent)
-
-        if (savedInstanceState == null && !startupWorkExecuted) {
-            startupWorkExecuted = true
-            try {
-                CountdownWorker.schedulePeriodicUpdates(applicationContext)
-                BatteryAlertService.syncWithDatabase(applicationContext)
-                VipRingManager.restoreIfLeftActive(applicationContext)
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-            CoroutineScope(Dispatchers.IO).launch {
-                try {
-                    WidgetUpdater.updateAllWidgets(applicationContext)
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
-            }
-        }
 
         setContent {
             val windowSizeClass = calculateWindowSizeClass(this)
@@ -204,9 +178,11 @@ class MainActivity : ComponentActivity() {
                 }
 
                 if (showSplash) {
-                    hasShownSplashInProcess = true
                     SentrySplashScreen(
-                        onSplashFinished = { showSplash = false }
+                        onSplashFinished = {
+                            hasShownSplashInProcess = true
+                            showSplash = false
+                        }
                     )
                 } else {
                     var showVipSetupScreen by rememberSaveable { mutableStateOf(false) }

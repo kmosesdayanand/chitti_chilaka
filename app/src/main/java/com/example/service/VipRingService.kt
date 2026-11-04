@@ -292,11 +292,21 @@ class VipRingService : Service() {
     }
 
     private fun buildNotification(contactName: String): Notification {
+        val publicNotification = NotificationCompat.Builder(this, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setContentTitle("VIP call ringing")
+            .setContentText("Volume boosted to ensure emergency call audibility")
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setOngoing(true)
+            .build()
+
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentTitle("VIP Call Ringing: $contactName")
             .setContentText("Volume boosted to ensure emergency call audibility")
             .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+            .setPublicVersion(publicNotification)
             .setOngoing(true)
             .build()
     }

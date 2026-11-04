@@ -165,18 +165,6 @@ fun SentrySplashScreen(
                 )
             )
 
-            Spacer(modifier = Modifier.height(6.dp))
-
-            // Tagline
-            Text(
-                text = "SMART DEVICE MONITOR",
-                style = MaterialTheme.typography.labelSmall.copy(
-                    fontWeight = FontWeight.Bold,
-                    color = SentryTealPrimary,
-                    letterSpacing = 2.5.sp
-                )
-            )
-
             Spacer(modifier = Modifier.height(36.dp))
 
             // Subtle loading bar
